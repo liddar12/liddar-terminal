@@ -41,7 +41,7 @@ data-source contract; it is not a claim of edge. Implemented as
 
 | Family | Covers (from Jimmy's list) | Point-in-time encoding | Source [VERIFY] |
 |---|---|---|---|
-| `price_action` | candles (OHLCV), volume, stock trend, momentum, realized vol | bar-derived numbers as of the signal bar | Schwab quotes/bars |
+| `price_action` | candles (OHLCV), volume, stock trend, momentum, realized vol | bar-derived numbers as of the signal bar **[wired]** | Schwab quotes/bars |
 | `macro_policy` | policy, rates, regulation, tariffs, elections | level / change / surprise-vs-consensus, dated to release | macro data providers |
 | `geopolitics` | wars, region wars & fighting, sanctions, chokepoint/shipping risk | dated risk indices + event flags | conflict/risk datasets |
 | `commodities` | finite goods, precious metals, energy balances | spot/curve levels, spreads, inventory/supply | commodity data + EIA |
@@ -120,11 +120,18 @@ outcomes say so, and no autonomy step happens without Jimmy's promotion.
   no-lookahead validator, and `assemble_features` — implemented and tested
   (`tests/test_features.py`). The scorer, calibration, registry, and updater
   interfaces that consume features are already scaffolded.
-- **Next [inferred sequencing]:** `PriceActionPack` wiring at Gate 2 (bars →
-  OHLCV/volume/trend), then the macro packs (`macro_policy`, `geopolitics`,
-  `commodities`, `ai_infra`) as a **feature-expansion track** layered on Gates
-  3+. Each pack's data source is `VERIFY` before wiring — no remembered
-  endpoints.
+- **Real at Gate 2 [verified]:** `PriceActionPack` is **wired** — a pure,
+  tested computation (`compute_price_action_features`) that turns a bar series
+  into 15 point-in-time technicals (returns, SMAs, trend, SMA cross, momentum,
+  RSI-14, ATR%, realized vol, relative volume, gap, range). It reads bars
+  through a `BarSource` seam: `InMemoryBarSource` for backtests/tests (real),
+  `SchwabBarSource` deferred to Gate 5. Strictly point-in-time — a future candle
+  cannot enter a snapshot — and it degrades gracefully on thin history rather
+  than faking values (`tests/test_price_action.py`, 9 checks).
+- **Next [inferred sequencing]:** the macro packs (`macro_policy`,
+  `geopolitics`, `commodities`, `ai_infra`) as a **feature-expansion track**
+  layered on Gates 3+. Each pack's data source is `VERIFY` before wiring — no
+  remembered endpoints.
 - **Honest gap:** no macro/geopolitical data is ingested yet. The layer that
   *holds* those features and enforces their correctness now exists; the feeds
   that fill it are named, gated, and unbuilt. Nothing claims edge from a family

@@ -9,19 +9,7 @@ is a silent stub. Each pack must obey no-lookahead: only observations with
 from __future__ import annotations
 
 from .base import FeaturePack, FeatureFamily, FeatureSnapshot
-
-
-class PriceActionPack(FeaturePack):
-    """Candles (OHLCV), volume, and price-derived technicals (trend, momentum,
-    realized vol). Sourced from Schwab/market-data quotes and bars."""
-
-    family = FeatureFamily.PRICE_ACTION
-    name = "price_action"
-
-    def snapshot(self, symbol: str, as_of_ts: int) -> FeatureSnapshot:
-        raise NotImplementedError(
-            "Gate 2: build OHLCV/volume/technical features from bars at/<= as_of_ts."
-        )
+from .price_action import PriceActionPack  # wired at Gate 2 (real implementation)
 
 
 class MacroPolicyPack(FeaturePack):

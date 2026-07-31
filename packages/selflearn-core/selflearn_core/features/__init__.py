@@ -11,13 +11,14 @@ from .base import (
     assemble_features,
     validate_no_lookahead,
 )
+from .bars import Bar, BarSource, InMemoryBarSource, SchwabBarSource
+from .price_action import PriceActionPack, compute_price_action_features
 from .families import (
     AiInfraPack,
     ALL_PACKS,
     CommoditiesPack,
     GeopoliticsPack,
     MacroPolicyPack,
-    PriceActionPack,
 )
 
 __all__ = [
@@ -26,7 +27,12 @@ __all__ = [
     "FeatureSnapshot",
     "assemble_features",
     "validate_no_lookahead",
+    "Bar",
+    "BarSource",
+    "InMemoryBarSource",
+    "SchwabBarSource",
     "PriceActionPack",
+    "compute_price_action_features",
     "MacroPolicyPack",
     "GeopoliticsPack",
     "CommoditiesPack",
