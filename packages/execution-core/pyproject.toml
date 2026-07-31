@@ -1,0 +1,19 @@
+[project]
+name = "execution-core"
+version = "0.0.1"
+description = "Broker-agnostic execution: Broker port, SimBroker, pure risk gate, idempotent OMS."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+# Live adapters add their SDK/http deps at their gate; core stays dep-free.
+schwab = ["requests>=2.31", "websocket-client>=1.7"]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["execution_core*"]
