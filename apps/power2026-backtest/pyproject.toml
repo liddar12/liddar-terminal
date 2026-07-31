@@ -1,0 +1,23 @@
+[project]
+name = "power2026-backtest"
+version = "0.0.1"
+description = "Backtests of the Power 2026 electricity-market claims (H1..H4)."
+requires-python = ">=3.11"
+# selflearn-core is a path dependency in this monorepo; installed editable
+# alongside this package. Data/fit deps (numpy, pandas, statsmodels, gridstatus,
+# requests) are added at Gate 2 when the bodies go live, keeping the groundwork
+# importable with no third-party installs.
+dependencies = []
+
+[project.optional-dependencies]
+fit = ["numpy>=1.26", "pandas>=2.0", "statsmodels>=0.14", "requests>=2.31"]
+iso = ["gridstatus>=0.29"]  # VERIFY current version + ISO coverage before pinning
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["power2026_backtest*"]
