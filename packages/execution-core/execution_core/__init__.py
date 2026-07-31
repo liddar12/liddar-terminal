@@ -6,6 +6,7 @@ broker. No self-learning logic lives here; the engine wires this to the spine.
 """
 
 from .broker import Broker
+from .control import Autonomy, ControlState, RiskLevel, RunState
 from .domain import (
     Balances,
     BrokerCapabilities,
@@ -28,5 +29,6 @@ __all__ = [
     "OrderIntent", "Order", "OrderAck", "OrderState", "OrderType",
     "Side", "TimeInForce", "Quote", "Position", "Balances", "BrokerCapabilities",
     "check", "Limits", "AccountState", "GateResult",
+    "ControlState", "RunState", "Autonomy", "RiskLevel",
 ]
 __version__ = "0.0.1"

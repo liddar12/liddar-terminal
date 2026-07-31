@@ -104,7 +104,14 @@ Safety is structural, not procedural. The only path from a signal to the broker 
 - **Pre-trade gate** (all checks must pass): position-size cap, aggregate exposure cap, daily-loss cap → session kill switch, buying-power/margin check, wash-sale guard, symbol allowlist, idempotency key present.
 - **Reconciliation loop**: broker is truth. Divergence between internal and broker state halts trading and raises an alert rather than trying to "fix" itself silently.
 - **Kill switch**: reachable from the terminal and triggered automatically by the daily-loss cap or by a reconciliation divergence.
-- **Staged autonomy** (mirrors the updater levels): read-only → simulated → human-approves-each → auto-within-limits. Each promotion is a manual gate with a verified track record behind it.
+- **Autonomous operation with real-time control.** The order path has **no
+  human-approval step** — the engine trades on its own. The user holds two live
+  levers (`execution_core.control.ControlState`, read every engine cycle):
+  **Pause/Resume** (kill switch) and **Risk level** (Off / Low / Med / High).
+  A change takes effect on the next cycle. Control can only make the system more
+  conservative; it can never bypass a cap. Autonomy is still staged — Sim
+  (paper) → Auto — and engaging Auto is a manual gate that should follow a
+  verified edge in sim. The hard rails below run regardless of control state.
 - **Audit log**: every decision (signal seen, intent formed, gate result, order sent, fill, reconciliation) is appended immutably. Serves compliance and feeds the learning loop.
 - **Secrets**: Schwab OAuth tokens and API keys live in a secrets store / env, never in the repo; tokens refresh on schedule. [inferred]
 
