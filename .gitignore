@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local data (never commit market data, prediction logs, or lot ledgers)
+data/
+*.sqlite
+*.sqlite3
+*.db
+*.parquet
+
+# Secrets / tokens (Schwab OAuth, EIA key, etc.)
+.env
+.env.*
+!.env.example
+secrets/
+*.token.json
+
+# Node / web terminal
+node_modules/
+.next/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

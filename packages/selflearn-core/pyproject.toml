@@ -1,0 +1,25 @@
+[project]
+name = "selflearn-core"
+version = "0.0.1"
+description = "Reusable self-learning spine: log predictions, resolve outcomes, score, feed back."
+requires-python = ">=3.11"
+dependencies = []
+
+# Gate 1: interfaces + schema only. Runtime deps (numpy/pandas/scikit-learn for
+# scoring + calibration) are added at Gate 2/3 when the bodies are implemented,
+# to keep the Gate 1 scaffold importable with zero third-party installs.
+
+[project.optional-dependencies]
+scoring = ["numpy>=1.26", "scikit-learn>=1.4"]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["selflearn_core*"]
+
+[tool.setuptools.package-data]
+selflearn_core = ["store/*.sql"]
