@@ -8,6 +8,30 @@ data client throwing an opaque auth error deep in a call.
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
+
+def _load_dotenv() -> None:
+    """Populate os.environ from the nearest .env (walking up from this file).
+
+    Stdlib only, no python-dotenv dependency. Existing environment variables
+    win over .env values (setdefault), so a real environment secret always
+    overrides the file. The .env itself is gitignored and never committed.
+    """
+    here = Path(__file__).resolve()
+    for parent in (here.parent, *here.parents):
+        env = parent / ".env"
+        if env.exists():
+            for line in env.read_text().splitlines():
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, _, v = line.partition("=")
+                os.environ.setdefault(k.strip(), v.strip())
+            break
+
+
+_load_dotenv()
 
 # Default ISO for H1 (Jimmy's Gate 2 call, default ERCOT; override via env).
 DEFAULT_ISO = os.environ.get("POWER2026_ISO", "ERCOT")
