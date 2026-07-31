@@ -118,6 +118,8 @@ In order:
 - `ScannerAdapter`: wraps the Liddar AI Calls/Puts output. Logs each idea (ticker, direction, strike, expiry, confidence); resolves against realized move over the horizon.
 - `PowerBacktestAdapter`: logs each hypothesis's forward prediction; resolves against realized LMP.
 
+**Feature layer** (`selflearn_core.features`): the wide signal universe — candles/volume/trend (`price_action`), plus macro (`macro_policy`), wars/regional conflict (`geopolitics`), finite goods/precious metals (`commodities`), and AI/data-center/power/water/chips (`ai_infra`) — becomes point-in-time, no-lookahead features. Alignment is **measured** per cohort on resolved outcomes, never hardcoded. Taxonomy + no-lookahead validator + assembler are real at Gate 1; concrete data packs unlock at Gates 2+. See `docs/feature-alignment.md`.
+
 **Storage**: start SQLite behind a storage interface (Parquet for backtest series). Supabase connector available if hosted later. Keep swappable; do not couple scoring to the store.
 
 ---

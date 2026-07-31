@@ -1,0 +1,87 @@
+"""Concrete feature packs, one per family.
+
+Signatures and family tags are fixed at Gate 1. Bodies raise
+``NotImplementedError`` naming the gate that unlocks the data wiring, so nothing
+is a silent stub. Each pack must obey no-lookahead: only observations with
+``obs_ts <= as_of_ts`` may enter the snapshot.
+"""
+
+from __future__ import annotations
+
+from .base import FeaturePack, FeatureFamily, FeatureSnapshot
+
+
+class PriceActionPack(FeaturePack):
+    """Candles (OHLCV), volume, and price-derived technicals (trend, momentum,
+    realized vol). Sourced from Schwab/market-data quotes and bars."""
+
+    family = FeatureFamily.PRICE_ACTION
+    name = "price_action"
+
+    def snapshot(self, symbol: str, as_of_ts: int) -> FeatureSnapshot:
+        raise NotImplementedError(
+            "Gate 2: build OHLCV/volume/technical features from bars at/<= as_of_ts."
+        )
+
+
+class MacroPolicyPack(FeaturePack):
+    """Rates, monetary/fiscal policy, regulation, elections, tariffs — encoded as
+    point-in-time levels/changes/surprise vs consensus, not narrative."""
+
+    family = FeatureFamily.MACRO_POLICY
+    name = "macro_policy"
+
+    def snapshot(self, symbol: str, as_of_ts: int) -> FeatureSnapshot:
+        raise NotImplementedError(
+            "Gate 3+ (feature expansion): macro/policy series as point-in-time features."
+        )
+
+
+class GeopoliticsPack(FeaturePack):
+    """Wars, regional conflict, sanctions, shipping-lane / chokepoint risk. Encoded
+    as dated risk indices/event flags; the scorer decides if they carry edge."""
+
+    family = FeatureFamily.GEOPOLITICS
+    name = "geopolitics"
+
+    def snapshot(self, symbol: str, as_of_ts: int) -> FeatureSnapshot:
+        raise NotImplementedError(
+            "Gate 3+ (feature expansion): geopolitical risk/event features, dated to source."
+        )
+
+
+class CommoditiesPack(FeaturePack):
+    """Finite goods, precious metals, energy — spot/curve levels, spreads, and
+    inventory/supply balances as point-in-time features."""
+
+    family = FeatureFamily.COMMODITIES
+    name = "commodities"
+
+    def snapshot(self, symbol: str, as_of_ts: int) -> FeatureSnapshot:
+        raise NotImplementedError(
+            "Gate 3+ (feature expansion): commodity/metal levels, spreads, balances."
+        )
+
+
+class AiInfraPack(FeaturePack):
+    """AI buildout, data centers, power, water, chips — the Power 2026 surface.
+    Feeds from the Workstream A research (EIA/ISO/gridstatus) once it produces
+    tradable, point-in-time signals."""
+
+    family = FeatureFamily.AI_INFRA
+    name = "ai_infra"
+
+    def snapshot(self, symbol: str, as_of_ts: int) -> FeatureSnapshot:
+        raise NotImplementedError(
+            "Gate 3+ (feature expansion): AI/data-center/power/water/chip features "
+            "from Workstream A outputs."
+        )
+
+
+ALL_PACKS = (
+    PriceActionPack,
+    MacroPolicyPack,
+    GeopoliticsPack,
+    CommoditiesPack,
+    AiInfraPack,
+)
