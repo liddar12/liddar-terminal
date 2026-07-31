@@ -69,7 +69,12 @@ True HFT (microsecond, colocation, direct market access, FIX) is **not available
 
 ### Signal → order → fill → reconcile (execution)
 1. Execution engine subscribes to newly scored, edge-positive signals from the core.
-2. Signal → order **intent** (symbol, side, quantity from the position sizer, order type).
+2. The self-learning layer emits **Low / Medium / High** recommendations for the
+   signal (`selflearn_core.recommend`), each carrying three separate lenses:
+   backtested performance (history), a forward estimate (projection + interval),
+   and live calibrated confidence. Confidence gates which tiers are offered.
+3. A tier is chosen → **order intent** (symbol, side, quantity sized within the
+   tier's cap, order type). Tier limits feed the risk gate; they don't bypass it.
 3. Intent passes the **pre-trade risk gate** (Section 5) including the wash-sale guard. Reject or proceed.
 4. OMS assigns a client-order key and routes to the `Broker` (sim or Schwab). Idempotent: a retry with the same key never double-sends.
 5. Fills stream back; the lot ledger and positions update.

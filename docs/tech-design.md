@@ -141,6 +141,30 @@ Runs: size cap, exposure cap, daily-loss cap, buying-power, **wash-sale guard**,
 
 ---
 
+## 4a. Risk-tiered recommendations (backtested vs forward vs self-learning)
+
+`selflearn_core.recommend`. The system keeps three lenses strictly separate so a
+projection is never sold as a fact:
+
+- **Backtested AI** (`BacktestView`): realized, out-of-sample / walk-forward
+  performance. History, not a promise.
+- **Future estimate** (`ForwardView`): an explicit projection for the horizon,
+  with an interval. Labelled an estimate; never merged into the backtest number.
+- **Self-learning AI** (`live_confidence`): the calibrated confidence that moves
+  as outcomes resolve, and decides which risk tiers a signal qualifies for.
+
+`build_recommendations(...)` emits **Low / Medium / High** versions of a signal.
+A tier is offered only when live confidence clears that tier's floor, so a shaky
+signal never produces a High-risk version. The tier changes size, eligibility,
+and expression (defined-risk spread vs directional), not the underlying signal.
+
+`TierPolicy` (per tier): `max_position_frac`, `max_gross_exposure_frac`,
+`min_live_confidence`, allowed `instruments`. These limits **feed the pre-trade
+risk gate** (Section 4): the tier proposes, the gate disposes. Defaults are
+starting points to calibrate from live results, not fixed truth (VERIFY before
+real capital). In the order path, tier selection sits **before sizing**: chosen
+tier → size within its cap → risk gate → OMS.
+
 ## 5. Data contracts (terminal ↔ core)
 
 Small, documented, JSON. The terminal never imports Python. [inferred]
