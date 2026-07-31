@@ -1,0 +1,44 @@
+{
+  "note": "Test universe: one liquid (high-volume) and one thin (low-volume) name per sector, so PriceActionPack and the scorer are exercised across liquidity regimes. Liquidity is a scoring cohort, not just a label — thin names have gappier features (gap, range_pct, vol_ratio) and worse fills, so they calibrate differently and must never be averaged in with liquid names.",
+  "verify": "Tickers are real; the high/low VOLUME ranking is from training knowledge. Confirm each name's live average daily volume (ADV) against current data before wiring. In the equity sectors, 'thin' also carries a small-cap/size factor — a confound to control for when scoring.",
+  "cohorts": ["liquid", "thin"],
+  "sectors": [
+    {
+      "sector": "ai_stock",
+      "high": {"ticker": "NVDA", "name": "NVIDIA", "cohort": "liquid"},
+      "low":  {"ticker": "AI",   "name": "C3.ai",  "cohort": "thin"}
+    },
+    {
+      "sector": "hyperscaler",
+      "high": {"ticker": "MSFT", "name": "Microsoft", "cohort": "liquid"},
+      "low":  {"ticker": "CRWV", "name": "CoreWeave (neocloud; newer, thinner)", "cohort": "thin"}
+    },
+    {
+      "sector": "oil",
+      "high": {"ticker": "XOM", "name": "ExxonMobil", "cohort": "liquid"},
+      "low":  {"ticker": "REI", "name": "Ring Energy (small-cap E&P)", "cohort": "thin"}
+    },
+    {
+      "sector": "gas_and_fuel",
+      "high": {"ticker": "EQT",  "name": "EQT Corp (largest US natgas producer)", "cohort": "liquid"},
+      "low":  {"ticker": "GPOR", "name": "Gulfport Energy (natgas)", "cohort": "thin"},
+      "alt_fuel_refiners": ["VLO", "MPC"]
+    },
+    {
+      "sector": "finance_banking",
+      "high": {"ticker": "BAC",  "name": "Bank of America (highest share volume of the big banks)", "cohort": "liquid"},
+      "low":  {"ticker": "NRIM", "name": "Northrim BanCorp (thin regional)", "cohort": "thin"}
+    },
+    {
+      "sector": "commodity_gold",
+      "high": {"ticker": "GLD",  "name": "SPDR Gold Shares", "cohort": "liquid"},
+      "low":  {"ticker": "SGOL", "name": "abrdn Physical Gold (same exposure, lower volume)", "cohort": "thin"},
+      "alt_high_beta_miners": ["HMY", "DRD"]
+    },
+    {
+      "sector": "bond_market",
+      "high": {"ticker": "TLT",  "name": "iShares 20+ Yr Treasury", "cohort": "liquid"},
+      "low":  {"ticker": "ZROZ", "name": "PIMCO 25+ Yr Zero-Coupon Treasury STRIPS (thinner, same duration bet)", "cohort": "thin"}
+    }
+  ]
+}
