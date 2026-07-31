@@ -11,7 +11,7 @@ from pathlib import Path
 
 from power2026_backtest.data.eia import parse_eia_series
 from power2026_backtest.data.iso import to_daily_mean
-from power2026_backtest.hypotheses import align, ols, run_h1
+from power2026_backtest.hypotheses import align, ols, run_h1, run_h1_multi
 from selflearn_core.store import SqliteStore
 
 
@@ -92,3 +92,29 @@ def test_run_h1_recovers_heat_rate_and_logs():
     assert len(resolved) == len(results)
     for rp in resolved:
         assert rp.outcome.realized["abs_err"] < 1e-6   # exact world -> ~0 error
+
+
+def test_run_h1_multi_across_horizons():
+    gas, power = _synthetic(n=200)
+    store = SqliteStore(str(Path(tempfile.mkdtemp()) / "s.sqlite"))
+    store.init_schema()
+
+    out = run_h1_multi(
+        "ERCOT", "2024-01-01", "2024-12-31",
+        horizons=["5d", "1m", "6m", "1y", "max"],
+        eia=_FakeEia(gas), iso_client=_FakeIso(power), store=store, train_size=60,
+    )
+
+    # 5d/1m/6m and max fit 200 days with train_size=60; 1y (252) does not.
+    assert set(out["results"]) == {"5d", "1m", "6m", "max"}
+    assert "1y" in out["skipped"]                       # skipped, not silently dropped
+
+    for label, res in out["results"].items():
+        assert res, f"{label} produced no folds"
+        for r in res:
+            assert abs(r.slope - 8.0) < 1e-6 and r.passes()
+            assert r.horizon == label
+
+    # predictions are tagged with their horizon in model_version/meta
+    versions = {rp.prediction.model_version for rp in store.resolved("power_backtest")}
+    assert "h1.v0/max" in versions and "h1.v0/5d" in versions
