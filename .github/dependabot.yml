@@ -1,0 +1,12 @@
+version: 2
+# Ongoing, automated dependency + action bumps. Opens small PRs weekly; CI gates
+# them. Free, native to GitHub, no secrets.
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: "/packages/selflearn-core"
+    schedule:
+      interval: weekly
