@@ -128,9 +128,22 @@ outcomes say so, and no autonomy step happens without Jimmy's promotion.
   `SchwabBarSource` deferred to Gate 5. Strictly point-in-time — a future candle
   cannot enter a snapshot — and it degrades gracefully on thin history rather
   than faking values (`tests/test_price_action.py`, 9 checks).
-- **Next [inferred sequencing]:** the macro packs (`macro_policy`,
-  `geopolitics`, `commodities`, `ai_infra`) as a **feature-expansion track**
-  layered on Gates 3+. Each pack's data source is `VERIFY` before wiring — no
+- **Real at Gate 2 [verified]:** the **walk-forward harness**
+  (`selflearn_core.backtest`) — signal → `Prediction` → resolver → cohort-scored
+  hit-rate + mean return with Wilson intervals, no lookahead by construction.
+  Runs over any `BarSource`; demonstrated end-to-end on the 14-name universe
+  (`examples/walkforward_demo.py`, synthetic bars — pooled hit-rates sit at ~0.50
+  with CIs straddling chance, i.e. no manufactured edge). Real bars drop in
+  unchanged.
+- **Real at Gate 3 [verified]:** `macro_policy` and `commodities` are **wired** —
+  feature math (curve slope, surprise-vs-consensus, term structure, roll yield,
+  storage draw) over a **point-in-time vintage source** (`InMemoryPitSource`)
+  that returns the value *as it stood at `as_of_ts`*, so a revision can't leak
+  backward. `commodities` is sector-linked (oil→XOM/REI, gold→GLD/SGOL, nothing
+  to a bank). Live `FredSeriesSource` / `EiaSeriesSource` are deferred stubs that
+  raise (`tests/test_macro_features.py`, `tests/test_walkforward.py`).
+- **Next [inferred sequencing]:** `geopolitics` and `ai_infra` remain
+  feature-expansion stubs. Each data source is `VERIFY` before wiring — no
   remembered endpoints.
 - **Honest gap:** no macro/geopolitical data is ingested yet. The layer that
   *holds* those features and enforces their correctness now exists; the feeds

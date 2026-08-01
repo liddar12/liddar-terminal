@@ -126,3 +126,21 @@ features = assemble_features(snaps, as_of_ts=t)   # namespaced + re-validated
 Every source above is **[VERIFY]** and several are **licensed** (ACLED, consensus
 data, semis pricing). Confirm access and licensing before wiring; where a source
 isn't available, the family stays a stub that raises rather than inventing data.
+
+---
+
+## 7. Status [verified]
+
+- **`macro_policy` and `commodities` are wired** — the feature *math* is real and
+  tested (`tests/test_macro_features.py`): curve slope, CPI surprise-vs-consensus,
+  term structure / roll yield, storage draw. Both read through a **point-in-time
+  vintage source** (`InMemoryPitSource`) that returns the value as it stood at
+  `as_of_ts` — a later revision is invisible to an earlier prediction. `commodities`
+  is sector-linked via the universe map (oil→XOM/REI, natgas→EQT/GPOR, gold→
+  GLD/SGOL; a bank gets nothing).
+- **What's not real yet:** the live feeds. `FredSeriesSource` and
+  `EiaSeriesSource` are deferred stubs that raise, naming the gate. Series ids in
+  `macro_policy.SERIES` / `commodities.SERIES` are best-effort and marked
+  `VERIFY` — confirm against FRED/EIA before wiring the live source. No macro data
+  is ingested; the machinery that will *hold and police* it is done and tested.
+- **`geopolitics` and `ai_infra`** remain stubs (Section 6 order).

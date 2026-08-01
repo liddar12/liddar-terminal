@@ -9,20 +9,9 @@ is a silent stub. Each pack must obey no-lookahead: only observations with
 from __future__ import annotations
 
 from .base import FeaturePack, FeatureFamily, FeatureSnapshot
-from .price_action import PriceActionPack  # wired at Gate 2 (real implementation)
-
-
-class MacroPolicyPack(FeaturePack):
-    """Rates, monetary/fiscal policy, regulation, elections, tariffs — encoded as
-    point-in-time levels/changes/surprise vs consensus, not narrative."""
-
-    family = FeatureFamily.MACRO_POLICY
-    name = "macro_policy"
-
-    def snapshot(self, symbol: str, as_of_ts: int) -> FeatureSnapshot:
-        raise NotImplementedError(
-            "Gate 3+ (feature expansion): macro/policy series as point-in-time features."
-        )
+from .price_action import PriceActionPack   # wired at Gate 2
+from .macro_policy import MacroPolicyPack    # wired: rates/curve/prints, vintage-aware
+from .commodities import CommoditiesPack     # wired: sector-linked curves + balances
 
 
 class GeopoliticsPack(FeaturePack):
@@ -35,19 +24,6 @@ class GeopoliticsPack(FeaturePack):
     def snapshot(self, symbol: str, as_of_ts: int) -> FeatureSnapshot:
         raise NotImplementedError(
             "Gate 3+ (feature expansion): geopolitical risk/event features, dated to source."
-        )
-
-
-class CommoditiesPack(FeaturePack):
-    """Finite goods, precious metals, energy — spot/curve levels, spreads, and
-    inventory/supply balances as point-in-time features."""
-
-    family = FeatureFamily.COMMODITIES
-    name = "commodities"
-
-    def snapshot(self, symbol: str, as_of_ts: int) -> FeatureSnapshot:
-        raise NotImplementedError(
-            "Gate 3+ (feature expansion): commodity/metal levels, spreads, balances."
         )
 
 
