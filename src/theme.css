@@ -1,0 +1,22 @@
+/* Terminal theme tokens. BreadthTab and ScannerTab read these via
+   var(--term-*, fallback), so overriding them here re-themes the whole app. */
+:root {
+  --term-bg: #0b0e14;
+  --term-fg: #d8dee9;
+  --term-muted: #6b7280;
+  --term-accent: #e8b64c;
+  --term-up: #4cc38a;
+  --term-down: #e5534b;
+  --term-grid: #1f2430;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  background: var(--term-bg);
+  color: var(--term-fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
