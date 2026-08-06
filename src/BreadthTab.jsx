@@ -1,37 +1,53 @@
 // src/BreadthTab.jsx
-// Breadth tab: RSP/SPY ratio from /api/breadth. Dependency-free SVG chart.
+// Breadth tab: RSP/SPY ratio from /api/breadth, charted with Recharts.
 //
-// Colors come from CSS custom properties with dark-terminal fallbacks, so it
-// picks up the terminal theme if these variables exist:
-//   --term-bg, --term-fg, --term-muted, --term-accent, --term-up, --term-down, --term-grid
-//
-// Polls every 30s (matches the server's cache TTL, so polling faster buys nothing).
-// Fails visibly: a 502 from the API renders an explicit error state.
+// Polls every 30s (matches the server's cache TTL). Fails visibly: a 502 from
+// the API renders an explicit error state; a failed refresh keeps the last good
+// data on screen with a banner.
 
 import { useEffect, useRef, useState } from 'react';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ReferenceLine,
+} from 'recharts';
+import { TERM } from './palette.js';
 
 const POLL_MS = 30_000;
-const W = 920, H = 380, PAD = { t: 16, r: 64, b: 28, l: 12 };
 
-const css = (name, fallback) =>
-  `var(${name}, ${fallback})`;
+const fmtDate = (t) =>
+  new Date(t * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-const C = {
-  bg: css('--term-bg', '#0b0e14'),
-  fg: css('--term-fg', '#d8dee9'),
-  muted: css('--term-muted', '#6b7280'),
-  accent: css('--term-accent', '#e8b64c'),   // ratio line
-  up: css('--term-up', '#4cc38a'),
-  down: css('--term-down', '#e5534b'),
-  grid: css('--term-grid', '#1f2430'),
-  dma50: '#5e9bd6',
-  dma200: '#b07cd6',
-};
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  const by = Object.fromEntries(payload.map((p) => [p.dataKey, p.value]));
+  return (
+    <div className="rounded border border-term-grid bg-term-bg/95 px-2.5 py-1.5 text-[11px]">
+      <div className="mb-0.5 text-term-muted">{fmtDate(label)}</div>
+      <div className="text-term-accent">ratio {by.ratio?.toFixed(4)}</div>
+      {by.dma50 != null && <div style={{ color: TERM.dma50 }}>50dma {by.dma50.toFixed(4)}</div>}
+      {by.dma200 != null && <div style={{ color: TERM.dma200 }}>200dma {by.dma200.toFixed(4)}</div>}
+    </div>
+  );
+}
+
+function LegendDot({ color, children }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="inline-block h-0.5 w-3.5" style={{ background: color }} />
+      <span className="text-term-muted">{children}</span>
+    </span>
+  );
+}
 
 export default function BreadthTab() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const [hover, setHover] = useState(null); // index into series
   const timer = useRef(null);
 
   const load = async () => {
@@ -52,128 +68,142 @@ export default function BreadthTab() {
     return () => clearInterval(timer.current);
   }, []);
 
-  if (!data && !error) return <Panel><Msg color={C.muted}>loading breadth…</Msg></Panel>;
-  if (!data && error) return <Panel><Msg color={C.down}>breadth data unavailable: {error}</Msg></Panel>;
+  if (!data && !error)
+    return (
+      <Panel>
+        <p className="p-6 text-[13px] text-term-muted">loading breadth…</p>
+      </Panel>
+    );
+  if (!data && error)
+    return (
+      <Panel>
+        <p className="p-6 text-[13px] text-term-down">breadth data unavailable: {error}</p>
+      </Panel>
+    );
 
   const { series, last, dma50, dma200, levels, regime, direction } = data;
 
-  // --- scales ---
-  const pts = series.filter(p => p.ratio != null);
+  const dirColor =
+    direction === 'rising' ? TERM.up : direction === 'falling' ? TERM.down : TERM.muted;
+
+  // y-domain from ratios, moving averages, and level lines with a little padding.
   const ys = [
-    ...pts.map(p => p.ratio),
+    ...series.map((p) => p.ratio),
+    ...series.map((p) => p.dma50),
+    ...series.map((p) => p.dma200),
     ...Object.values(levels),
-    ...pts.map(p => p.dma50).filter(v => v != null),
-    ...pts.map(p => p.dma200).filter(v => v != null),
-  ];
-  const yMin = Math.min(...ys) * 0.999, yMax = Math.max(...ys) * 1.001;
-  const x = i => PAD.l + (i / (pts.length - 1)) * (W - PAD.l - PAD.r);
-  const y = v => PAD.t + (1 - (v - yMin) / (yMax - yMin)) * (H - PAD.t - PAD.b);
-
-  const path = (get) => {
-    let d = '';
-    pts.forEach((p, i) => {
-      const v = get(p);
-      if (v == null) return;
-      d += (d ? ' L' : 'M') + `${x(i).toFixed(1)},${y(v).toFixed(1)}`;
-    });
-    return d;
-  };
-
-  const dirColor = direction === 'rising' ? C.up : direction === 'falling' ? C.down : C.muted;
-  const hp = hover != null ? pts[hover] : null;
-
-  const onMove = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const px = ((e.clientX - rect.left) / rect.width) * W;
-    const i = Math.round(((px - PAD.l) / (W - PAD.l - PAD.r)) * (pts.length - 1));
-    setHover(Math.max(0, Math.min(pts.length - 1, i)));
-  };
+  ].filter((v) => v != null);
+  const yMin = Math.min(...ys) * 0.999;
+  const yMax = Math.max(...ys) * 1.001;
 
   return (
     <Panel>
       {/* header */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 8, flexWrap: 'wrap' }}>
-        <span style={{ color: C.fg, fontSize: 15, fontWeight: 600 }}>RSP / SPY</span>
-        <span style={{ color: dirColor, fontSize: 22, fontVariantNumeric: 'tabular-nums' }}>
+      <div className="mb-2 flex flex-wrap items-baseline gap-4">
+        <span className="text-[15px] font-semibold text-term-fg">RSP / SPY</span>
+        <span className="text-2xl tabular-nums" style={{ color: dirColor }}>
           {last?.toFixed(4)}
         </span>
-        <span style={{ color: C.muted, fontSize: 12 }}>
+        <span className="text-xs text-term-muted">
           50dma {dma50?.toFixed(4)} · 200dma {dma200?.toFixed(4)}
         </span>
-        <span style={{
-          color: dirColor, fontSize: 12, border: `1px solid ${dirColor}`,
-          borderRadius: 3, padding: '2px 8px', marginLeft: 'auto',
-        }}>
+        <span
+          className="ml-auto rounded border px-2 py-0.5 text-xs"
+          style={{ color: dirColor, borderColor: dirColor }}
+        >
           {regime}
         </span>
       </div>
 
       {error && (
-        <div style={{ color: C.down, fontSize: 12, marginBottom: 6 }}>
+        <div className="mb-1.5 text-xs text-term-down">
           refresh failed ({error}), showing last good data
         </div>
       )}
 
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }}
-           onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
-        {/* horizontal grid + level lines */}
-        {[
-          { v: levels.support, label: `sup ${levels.support}`, color: C.down },
-          { v: levels.resistance, label: `res ${levels.resistance}`, color: C.up },
-        ].map(l => (
-          <g key={l.label}>
-            <line x1={PAD.l} x2={W - PAD.r} y1={y(l.v)} y2={y(l.v)}
-                  stroke={l.color} strokeDasharray="2 5" strokeWidth="1" opacity="0.7" />
-            <text x={W - PAD.r + 6} y={y(l.v) + 3} fill={l.color} fontSize="10">{l.label}</text>
-          </g>
-        ))}
+      <div className="h-[380px] w-full">
+        <ResponsiveContainer>
+          <LineChart data={series} margin={{ top: 12, right: 56, bottom: 4, left: 4 }}>
+            <CartesianGrid vertical={false} stroke={TERM.grid} />
+            <XAxis
+              dataKey="t"
+              tickFormatter={fmtDate}
+              minTickGap={48}
+              tick={{ fill: TERM.muted, fontSize: 10 }}
+              stroke={TERM.grid}
+            />
+            <YAxis
+              domain={[yMin, yMax]}
+              tickFormatter={(v) => v.toFixed(3)}
+              width={52}
+              tick={{ fill: TERM.muted, fontSize: 10 }}
+              stroke={TERM.grid}
+            />
+            <Tooltip content={<ChartTooltip />} cursor={{ stroke: TERM.muted, strokeWidth: 0.8 }} />
 
-        {/* moving averages */}
-        <path d={path(p => p.dma50)} fill="none" stroke={C.dma50} strokeWidth="1.2" opacity="0.9" />
-        <path d={path(p => p.dma200)} fill="none" stroke={C.dma200} strokeWidth="1.2" opacity="0.9" />
+            <ReferenceLine
+              y={levels.support}
+              stroke={TERM.down}
+              strokeDasharray="2 5"
+              label={{
+                value: `sup ${levels.support}`,
+                position: 'insideBottomRight',
+                fill: TERM.down,
+                fontSize: 10,
+              }}
+            />
+            <ReferenceLine
+              y={levels.resistance}
+              stroke={TERM.up}
+              strokeDasharray="2 5"
+              label={{
+                value: `res ${levels.resistance}`,
+                position: 'insideTopRight',
+                fill: TERM.up,
+                fontSize: 10,
+              }}
+            />
 
-        {/* ratio */}
-        <path d={path(p => p.ratio)} fill="none" stroke={C.accent} strokeWidth="1.6" />
+            <Line
+              type="monotone"
+              dataKey="dma200"
+              stroke={TERM.dma200}
+              strokeWidth={1.2}
+              dot={false}
+              isAnimationActive={false}
+              connectNulls
+            />
+            <Line
+              type="monotone"
+              dataKey="dma50"
+              stroke={TERM.dma50}
+              strokeWidth={1.2}
+              dot={false}
+              isAnimationActive={false}
+              connectNulls
+            />
+            <Line
+              type="monotone"
+              dataKey="ratio"
+              stroke={TERM.accent}
+              strokeWidth={1.6}
+              dot={false}
+              isAnimationActive={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
 
-        {/* last-value marker */}
-        <circle cx={x(pts.length - 1)} cy={y(pts[pts.length - 1].ratio)} r="3" fill={C.accent} />
-
-        {/* hover crosshair */}
-        {hp && (
-          <g>
-            <line x1={x(hover)} x2={x(hover)} y1={PAD.t} y2={H - PAD.b}
-                  stroke={C.muted} strokeWidth="0.8" opacity="0.6" />
-            <circle cx={x(hover)} cy={y(hp.ratio)} r="3" fill="none" stroke={C.fg} />
-            <text x={Math.min(x(hover) + 8, W - 150)} y={PAD.t + 12} fill={C.fg} fontSize="11">
-              {new Date(hp.t * 1000).toLocaleDateString()} · {hp.ratio.toFixed(4)}
-            </text>
-          </g>
-        )}
-
-        {/* legend */}
-        <g fontSize="10" fill={C.muted}>
-          <text x={PAD.l} y={H - 8}>
-            <tspan fill={C.accent}>— ratio</tspan>
-            <tspan dx="12" fill={C.dma50}>— 50dma</tspan>
-            <tspan dx="12" fill={C.dma200}>— 200dma</tspan>
-          </text>
-        </g>
-      </svg>
+      {/* legend */}
+      <div className="mt-2 flex gap-4 text-[10px]">
+        <LegendDot color={TERM.accent}>ratio</LegendDot>
+        <LegendDot color={TERM.dma50}>50dma</LegendDot>
+        <LegendDot color={TERM.dma200}>200dma</LegendDot>
+      </div>
     </Panel>
   );
 }
 
 function Panel({ children }) {
-  return (
-    <div style={{
-      background: C.bg, color: C.fg, padding: 16, borderRadius: 6,
-      fontFamily: 'inherit', minHeight: 200,
-    }}>
-      {children}
-    </div>
-  );
-}
-
-function Msg({ color, children }) {
-  return <div style={{ color, fontSize: 13, padding: 24 }}>{children}</div>;
+  return <div className="min-h-[200px] rounded-md bg-term-panel p-4">{children}</div>;
 }

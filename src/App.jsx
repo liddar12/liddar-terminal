@@ -6,13 +6,6 @@ import { useState } from 'react';
 import BreadthTab from './BreadthTab.jsx';
 import ScannerTab from './ScannerTab.jsx';
 
-const C = {
-  fg: 'var(--term-fg, #d8dee9)',
-  muted: 'var(--term-muted, #6b7280)',
-  accent: 'var(--term-accent, #e8b64c)',
-  grid: 'var(--term-grid, #1f2430)',
-};
-
 const TABS = [
   { id: 'breadth', label: 'Breadth', render: () => <BreadthTab /> },
   { id: 'calls', label: 'AI Calls', render: () => <ScannerTab side="calls" /> },
@@ -24,31 +17,25 @@ export default function App() {
   const tab = TABS.find((t) => t.id === active) ?? TABS[0];
 
   return (
-    <div style={{ maxWidth: 980, margin: '0 auto', padding: 16 }}>
-      <header style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 12 }}>
-        <span style={{ color: C.accent, fontSize: 16, fontWeight: 700, letterSpacing: 0.5 }}>
-          liddar terminal
-        </span>
-        <span style={{ color: C.muted, fontSize: 12 }}>options + breadth</span>
+    <div className="mx-auto max-w-5xl px-4 py-5">
+      <header className="mb-4 flex items-baseline gap-3">
+        <span className="text-base font-bold tracking-wide text-term-accent">liddar terminal</span>
+        <span className="text-xs text-term-muted">options + breadth</span>
       </header>
 
-      <nav style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${C.grid}`, marginBottom: 16 }}>
+      <nav className="mb-5 flex gap-1 border-b border-term-grid">
         {TABS.map((t) => {
           const on = t.id === active;
           return (
             <button
               key={t.id}
               onClick={() => setActive(t.id)}
-              style={{
-                background: 'transparent',
-                color: on ? C.accent : C.muted,
-                border: 'none',
-                borderBottom: `2px solid ${on ? C.accent : 'transparent'}`,
-                padding: '8px 14px',
-                fontFamily: 'inherit',
-                fontSize: 13,
-                cursor: 'pointer',
-              }}
+              className={
+                'border-b-2 px-4 py-2 text-[13px] transition-colors ' +
+                (on
+                  ? 'border-term-accent text-term-accent'
+                  : 'border-transparent text-term-muted hover:text-term-fg')
+              }
             >
               {t.label}
             </button>

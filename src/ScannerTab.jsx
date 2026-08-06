@@ -10,15 +10,6 @@
 
 import { useState } from 'react';
 
-const C = {
-  fg: 'var(--term-fg, #d8dee9)',
-  muted: 'var(--term-muted, #6b7280)',
-  accent: 'var(--term-accent, #e8b64c)',
-  up: 'var(--term-up, #4cc38a)',
-  down: 'var(--term-down, #e5534b)',
-  grid: 'var(--term-grid, #1f2430)',
-};
-
 // From docs/breadth-integration.md §2 — omit on failure, never fabricate.
 async function getRegimeLine() {
   try {
@@ -78,83 +69,53 @@ export default function ScannerTab({ side }) {
   const title = side === 'puts' ? 'AI Puts' : 'AI Calls';
 
   return (
-    <div style={{ background: 'var(--term-bg, #0b0e14)', padding: 16, borderRadius: 6 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-        <span style={{ color: C.fg, fontSize: 15, fontWeight: 600 }}>{title}</span>
-        <span
-          style={{
-            color: C.muted,
-            fontSize: 11,
-            border: `1px solid ${C.grid}`,
-            borderRadius: 3,
-            padding: '2px 6px',
-          }}
-        >
+    <div className="rounded-md bg-term-panel p-4">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <span className="text-[15px] font-semibold text-term-fg">{title}</span>
+        <span className="rounded border border-term-grid px-1.5 py-0.5 text-[11px] text-term-muted">
           scaffold — wired to /api/claude + breadth regime
         </span>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div className="mb-3 flex flex-wrap gap-2">
         <input
           value={tickers}
           onChange={(e) => setTickers(e.target.value)}
           placeholder="comma-separated tickers"
-          style={{
-            flex: 1,
-            minWidth: 240,
-            background: 'transparent',
-            color: C.fg,
-            border: `1px solid ${C.grid}`,
-            borderRadius: 4,
-            padding: '6px 10px',
-            fontFamily: 'inherit',
-            fontSize: 13,
-          }}
+          className="min-w-[240px] flex-1 rounded border border-term-grid bg-transparent px-2.5 py-1.5 text-[13px] text-term-fg outline-none focus:border-term-accent"
         />
         <button
           onClick={run}
           disabled={busy}
-          style={{
-            background: 'transparent',
-            color: busy ? C.muted : C.accent,
-            border: `1px solid ${busy ? C.grid : C.accent}`,
-            borderRadius: 4,
-            padding: '6px 14px',
-            fontFamily: 'inherit',
-            fontSize: 13,
-            cursor: busy ? 'default' : 'pointer',
-          }}
+          className={
+            'rounded border px-3.5 py-1.5 text-[13px] transition-colors ' +
+            (busy
+              ? 'cursor-default border-term-grid text-term-muted'
+              : 'border-term-accent text-term-accent hover:bg-term-accent/10')
+          }
         >
           {busy ? 'scanning…' : 'run scan'}
         </button>
       </div>
 
-      {error && <div style={{ color: C.down, fontSize: 12, marginBottom: 8 }}>scan failed: {error}</div>}
+      {error && <div className="mb-2 text-xs text-term-down">scan failed: {error}</div>}
 
       {out && (
         <>
-          <div style={{ color: out.regimeUsed ? C.up : C.muted, fontSize: 11, marginBottom: 6 }}>
-            {out.regimeUsed ? 'breadth regime injected into prompt' : 'breadth unavailable — regime line omitted'}
+          <div className={'mb-1.5 text-[11px] ' + (out.regimeUsed ? 'text-term-up' : 'text-term-muted')}>
+            {out.regimeUsed
+              ? 'breadth regime injected into prompt'
+              : 'breadth unavailable — regime line omitted'}
           </div>
-          <pre
-            style={{
-              color: C.fg,
-              fontSize: 13,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              margin: 0,
-            }}
-          >
-            {out.text}
-          </pre>
+          <pre className="m-0 whitespace-pre-wrap break-words text-[13px] text-term-fg">{out.text}</pre>
         </>
       )}
 
       {!out && !error && (
-        <div style={{ color: C.muted, fontSize: 13 }}>
-          Enter a watchlist and run a scan. The live RSP/SPY breadth regime is injected into the
-          prompt automatically when available.
-        </div>
+        <p className="text-[13px] text-term-muted">
+          Enter a watchlist and run a scan. The live RSP/SPY breadth regime is injected into the prompt
+          automatically when available.
+        </p>
       )}
     </div>
   );
