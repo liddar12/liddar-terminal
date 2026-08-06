@@ -5,11 +5,13 @@
 import { useState } from 'react';
 import BreadthTab from './BreadthTab.jsx';
 import ScannerTab from './ScannerTab.jsx';
+import ScoresTab from './ScoresTab.jsx';
 
 const TABS = [
   { id: 'breadth', label: 'Breadth', render: () => <BreadthTab /> },
   { id: 'calls', label: 'AI Calls', render: () => <ScannerTab side="calls" /> },
   { id: 'puts', label: 'AI Puts', render: () => <ScannerTab side="puts" /> },
+  { id: 'scores', label: 'Scores', render: () => <ScoresTab /> },
 ];
 
 export default function App() {
