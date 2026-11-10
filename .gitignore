@@ -3,5 +3,10 @@ dist/
 .vercel/
 .env
 .env.local
+.env.*
+!.env.example
 *.log
 .DS_Store
+
+test-results/
+playwright-report/

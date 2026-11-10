@@ -5,21 +5,22 @@
 // empty list (honest, not fabricated).
 
 import { configured, listResolved, scoreIdeas } from './_store.js';
+import { requireOwner } from './_auth.js';
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
+  if (!await requireOwner(req, res)) return;
   if (!configured()) {
     return res.status(503).json({
-      error: 'storage not configured: set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY',
+      error: 'Storage is not configured.',
     });
   }
   try {
     const { task } = req.query || {};
+    if (task != null && (typeof task !== 'string' || task.length > 200)) return res.status(400).json({ error: 'Invalid task.' });
     const rows = await listResolved({ task: task || undefined });
     return res.status(200).json({ scores: scoreIdeas(rows), resolved_count: rows.length });
   } catch (e) {
-    console.error('scores read failed:', e.message);
-    return res.status(502).json({ error: e.message });
+    return res.status(502).json({ error: 'Prediction storage is temporarily unavailable.' });
   }
 }

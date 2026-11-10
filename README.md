@@ -3,6 +3,12 @@
 Vite + React options terminal, deployed on Vercel. Serverless functions live in
 `api/`; the UI lives in `src/`.
 
+Owner sign-in is required before private panels, prediction data, or paid research
+requests are available. Follow [owner authentication setup](docs/owner-auth-setup.md)
+and `.env.example`. Missing Auth configuration keeps the app locked. Node 22 is
+required by the pinned Supabase client. Hosted secrets must not be enabled before
+the owner-auth and schema checks pass.
+
 ## Tabs
 
 - **Breadth** — RSP/SPY breadth ratio from `/api/breadth`: 1y chart with 50/200dma
@@ -10,9 +16,9 @@ Vite + React options terminal, deployed on Vercel. Serverless functions live in
   Polls every 30s. Fully wired and verified against live Yahoo data.
 - **AI Calls / AI Puts** — options scanners that call `/api/claude` and inject the
   live breadth regime into the prompt (per `docs/breadth-integration.md` §2).
-  **Scaffold:** the original production scanner prompt is not in this repo, so
-  `buildScannerPrompt()` in `src/ScannerTab.jsx` is a working placeholder. Drop the
-  real prompt in there — the breadth wiring (`getRegimeLine`) is production-ready.
+  The prompt and parsing helpers live in `src/scannerPrompt.js` and retain the
+  production prompt structure captured in the November handoff. This is a
+  research scanner; there is no order-execution route.
 
 ## API
 
@@ -20,7 +26,11 @@ Vite + React options terminal, deployed on Vercel. Serverless functions live in
   Fails loud (502) when Yahoo's unofficial endpoint misbehaves; the tab shows an
   error state and scanners omit the regime line.
 - `api/claude.js` — proxy to the Anthropic Messages API. Keeps `ANTHROPIC_API_KEY`
-  server-side. `POST { messages, system?, model?, max_tokens? }`.
+  server-side. Owner-only `POST { messages, system?, max_tokens? }`; the server
+  chooses the model and bounds the request size and output tokens.
+- `api/session.js` — verifies the owner's Supabase Auth session.
+- `api/log-prediction.js`, `api/predictions.js`, `api/scores.js` — owner-only
+  append/read/scoring APIs. Database receipt times come from the reviewed schema.
 
 ## Local dev
 
@@ -32,13 +42,14 @@ vercel dev
 npm run dev
 ```
 
-Set `ANTHROPIC_API_KEY` (see `.env.example`) for the scanner tabs. The Breadth tab
-needs no key.
+Configure owner Auth first (see `.env.example` and the setup guide). The market
+data endpoints use no private key; research and storage secrets remain server-side.
 
 ## Deploy
 
-Vercel auto-detects the Vite framework and the `api/` functions. Set
-`ANTHROPIC_API_KEY` in the project's environment variables.
+Vercel auto-detects the Vite framework and the `api/` functions. Use the intended
+project, Node 22, and the staged setup/verification procedure in the owner-auth
+guide. This local patch has not been deployed.
 
 ## Related
 

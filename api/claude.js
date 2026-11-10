@@ -10,20 +10,25 @@
 //
 // Env: ANTHROPIC_API_KEY (required), CLAUDE_MODEL (optional default).
 
+import { requireOwner } from './_auth.js';
+
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
-const DEFAULT_MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+  if (!await requireOwner(req, res)) return;
 
   const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+  if (!key) return res.status(503).json({ error: 'Research provider is not configured.' });
 
   try {
-    const { system, messages, model, max_tokens } = req.body || {};
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return res.status(400).json({ error: 'messages[] required' });
+    const { system, messages, max_tokens = 1024 } = req.body || {};
+    if (!Array.isArray(messages) || messages.length === 0 || messages.length > 20
+      || messages.some((m) => !['user', 'assistant'].includes(m?.role) || typeof m.content !== 'string')
+      || (system != null && typeof system !== 'string')
+      || !Number.isInteger(max_tokens) || max_tokens < 1 || max_tokens > 4096
+      || JSON.stringify({ system, messages }).length > 64000) {
+      return res.status(400).json({ error: 'Invalid research request.' });
     }
 
     const r = await fetch(ANTHROPIC_URL, {
@@ -34,20 +39,21 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: model || DEFAULT_MODEL,
-        max_tokens: max_tokens || 1024,
+        model: process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001',
+        max_tokens,
         ...(system ? { system } : {}),
         messages,
       }),
+      redirect: 'error',
+      signal: AbortSignal.timeout(45000),
     });
 
     const j = await r.json();
     if (!r.ok) {
-      return res.status(r.status).json({ error: j?.error?.message || `Anthropic HTTP ${r.status}` });
+      return res.status(r.status === 429 ? 429 : 502).json({ error: 'Research provider is temporarily unavailable.' });
     }
     return res.status(200).json(j);
   } catch (e) {
-    console.error('claude proxy failed:', e.message);
-    return res.status(502).json({ error: `claude proxy failed: ${e.message}` });
+    return res.status(502).json({ error: 'Research provider is temporarily unavailable.' });
   }
 }
