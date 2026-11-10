@@ -27,10 +27,26 @@ export function publicAuthConfig(env = {}) {
   return url && key ? { url, key } : null;
 }
 
+// These are the only application settings permitted in the browser bundle.
+export const PUBLIC_AUTH_ENV_NAMES = Object.freeze([
+  'VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY',
+]);
+
+// Vercel injects these documented metadata names for Vite builds. Accept the
+// exact names at build time, but exclude them from the browser via envPrefix.
+// https://vercel.com/docs/environment-variables/framework-environment-variables
+const VERCEL_METADATA_ENV_NAMES = new Set([
+  'ENV', 'TARGET_ENV', 'URL', 'BRANCH_URL', 'PROJECT_PRODUCTION_URL',
+  'DEPLOYMENT_ID', 'PROJECT_ID', 'GIT_PROVIDER', 'GIT_REPO_SLUG',
+  'GIT_REPO_OWNER', 'GIT_REPO_ID', 'GIT_COMMIT_REF', 'GIT_COMMIT_SHA',
+  'GIT_COMMIT_MESSAGE', 'GIT_COMMIT_AUTHOR_LOGIN', 'GIT_COMMIT_AUTHOR_NAME',
+  'GIT_PREVIOUS_SHA', 'GIT_PULL_REQUEST_ID',
+].map((name) => `VITE_VERCEL_${name}`));
+
 export function assertPublicBuildConfig(env = {}) {
-  const allowed = new Set(['VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY']);
-  if (Object.keys(env).some((k) => k.startsWith('VITE_') && !allowed.has(k))) {
-    throw new Error('Only the documented public sign-in settings may use the VITE_ prefix.');
+  const allowed = new Set(PUBLIC_AUTH_ENV_NAMES);
+  if (Object.keys(env).some((k) => k.startsWith('VITE_') && !allowed.has(k) && !VERCEL_METADATA_ENV_NAMES.has(k))) {
+    throw new Error('Only documented public sign-in settings and Vercel metadata may use the VITE_ prefix.');
   }
   if ((env.VITE_SUPABASE_URL || env.VITE_SUPABASE_PUBLISHABLE_KEY) && !publicAuthConfig(env)) {
     throw new Error('Invalid public sign-in settings. Never put a secret or service-role key in VITE_ variables.');

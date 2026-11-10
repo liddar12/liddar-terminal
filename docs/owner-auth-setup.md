@@ -21,7 +21,9 @@ This patch is prepared against main `6f4af5112c4a43247428f1ad64cd9ebdb5fa9602`. 
 | `ANTHROPIC_API_KEY` | Server research proxy | Secret; only after auth checks |
 | `CLAUDE_MODEL` | Optional server-selected model | Server configuration |
 
-Vite serializes `VITE_` variables into public JavaScript. The build rejects undocumented `VITE_` variables, secret keys in the public-key field, and invalid project URLs. It intentionally supports standard `https://<project-ref>.supabase.co` origins only. Custom domains/local Supabase require a separately reviewed allowlist change. Empty configuration builds a locked setup screen; partially configured or unsafe public settings fail the build.
+Vite normally serializes `VITE_` variables into public JavaScript. This project restricts `envPrefix` to the two public Auth setting names and validates exact names before bundling. The build accepts Vercel's exact documented framework metadata names, such as `VITE_VERCEL_ENV`, but excludes their values from the browser bundle. Unknown `VITE_` names, credential-like `VITE_VERCEL_*` names, secret keys in the public-key field, and invalid project URLs still fail the build. See [Vercel's framework-variable list](https://vercel.com/docs/environment-variables/framework-environment-variables) and [Vite's envPrefix setting](https://vite.dev/config/shared-options.html#envprefix).
+
+The app intentionally supports standard `https://<project-ref>.supabase.co` origins only. Custom domains/local Supabase require a separately reviewed allowlist change. Empty configuration builds a locked setup screen; partially configured or unsafe public settings fail the build.
 
 5. Use **Node 22** for the Vercel project and CI. The pinned Supabase JS 2.119.0 package requires Node >=22; this repository pins the deployment engine to 22.x.
 6. First deploy the sign-in settings without database/research secrets. Check anonymous requests to `/api/session`, `/api/predictions`, `/api/scores`, `/api/log-prediction` and `/api/claude` receive 401; a valid other-account token receives 403. An owner can verify their session but storage/research requests return 503 while secrets are absent.
@@ -53,7 +55,7 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-The Node tests cover wrong-owner, missing/expired/malformed token and upstream failure behavior; API authorization before store/provider work; key/header handling; public-build secret rejection; local-only bearer transport; record validation; and the existing scanner behavior.
+The Node tests cover wrong-owner, missing/expired/malformed token and upstream failure behavior; API authorization before store/provider work; key/header handling; public-build secret rejection; local-only bearer transport; record validation; and the existing scanner behavior. A production-build regression uses synthetic Vercel metadata to verify that deployment builds accept the documented names while their values remain absent from the public bundle.
 
 The browser test exercises the real React sign-in UI and real server API handlers against deterministic **mock Supabase Auth/database responses**: anonymous denial, wrong-owner sign-in, owner login, private scores, reload, sign-out and empty session storage. It never contacts a live account, database or paid provider. To use an installed system Chromium, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to its absolute executable path. Hosted Auth and real key provisioning remain separate deployment checks.
 

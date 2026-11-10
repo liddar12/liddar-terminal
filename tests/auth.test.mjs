@@ -75,6 +75,17 @@ test('public build configuration rejects secret keys, dangerous URLs and stray V
   assert.throws(() => assertPublicBuildConfig({ ...good, VITE_ANTHROPIC_API_KEY: 'bad' }));
 });
 
+test('Vercel build metadata is accepted without accepting credential-like or unknown names', () => {
+  assertPublicBuildConfig({ VITE_VERCEL_ENV: 'preview', VITE_VERCEL_URL: 'fixture.vercel.app', VITE_VERCEL_GIT_COMMIT_SHA: 'fixture' });
+  for (const name of [
+    'VITE_VERCEL_TOKEN', 'VITE_VERCEL_OIDC_TOKEN', 'VITE_VERCEL_SECRET',
+    'VITE_VERCEL_API_KEY', 'VITE_VERCEL_UNKNOWN', 'VITE_OTHER_SETTING',
+    'VITE_SUPABASE_URL_SECRET', 'VITE_SUPABASE_PUBLISHABLE_KEY_SECRET',
+  ]) {
+    assert.throws(() => assertPublicBuildConfig({ [name]: 'fixture-must-not-ship' }), name);
+  }
+});
+
 test('client sends session only to local API routes, never follows redirects or retries mutations', async () => {
   const calls = [];
   const client = { auth: { getSession: async () => ({ data: { session: { access_token: TOKEN } } }) } };
