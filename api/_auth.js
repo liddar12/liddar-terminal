@@ -1,6 +1,15 @@
 import { publicKey, supabaseUrl } from '../shared/authConfig.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Credentials are deliberately absent from the serializable owner object.
+// Only objects returned after live Auth verification can authorize storage.
+const verifiedOwners = new WeakMap();
+
+export function verifiedOwnerStorageContext(owner) {
+  const context = verifiedOwners.get(owner);
+  if (!context) throw new Error('Verified owner authorization is required.');
+  return context;
+}
 
 // Returns a verified owner or null after sending an error response. This must
 // run before every private data access and paid provider call. A client session
@@ -37,7 +46,9 @@ export async function requireOwner(req, res, { env = process.env, fetchImpl = fe
       res.status(403).json({ error: 'This account is not authorized for this terminal.' });
       return null;
     }
-    return { id: user.id, email: typeof user.email === 'string' ? user.email : null };
+    const owner = Object.freeze({ id: user.id, email: typeof user.email === 'string' ? user.email : null });
+    verifiedOwners.set(owner, Object.freeze({ url, key, authorization }));
+    return owner;
   } catch {
     res.status(503).json({ error: 'Sign-in verification is temporarily unavailable.' });
     return null;

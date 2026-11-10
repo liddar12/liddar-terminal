@@ -6,6 +6,7 @@
 
 import { configured, insertPrediction } from './_store.js';
 import { requireOwner } from './_auth.js';
+import { isTradingTask } from './_tradingTasks.js';
 
 const REQUIRED = ['id', 'ts', 'model_version', 'task', 'features', 'prediction', 'horizon_s'];
 const DIRECTIONS = new Set(['rising', 'falling', 'flat']);
@@ -19,6 +20,7 @@ export function validate(rec) {
   for (const k of ['id', 'model_version', 'task']) {
     if (typeof rec[k] !== 'string' || !rec[k].trim() || rec[k].length > 200) return `${k} must be a nonempty string of at most 200 characters`;
   }
+  if (!isTradingTask(rec.task)) return 'task must identify a trading task';
   if (!Number.isSafeInteger(rec.ts) || rec.ts < 0 || rec.ts > Math.floor(Date.now() / 1000) + 300) return 'ts must be valid unix seconds, not in the future';
   if (!Number.isSafeInteger(rec.horizon_s) || rec.horizon_s < 1 || rec.horizon_s > 315576000) return 'horizon_s must be an integer from 1 to 315576000';
   if (!object(rec.features)) return 'features must be an object';
@@ -50,7 +52,7 @@ export default async function handler(req, res) {
     const rec = req.body;
     const bad = validate(rec);
     if (bad) return res.status(400).json({ error: bad });
-    await insertPrediction({
+    await insertPrediction(user, {
       id: rec.id,
       ts: rec.ts,
       model_version: rec.model_version,

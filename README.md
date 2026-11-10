@@ -6,8 +6,9 @@ Vite + React options terminal, deployed on Vercel. Serverless functions live in
 Owner sign-in is required before private panels, prediction data, or paid research
 requests are available. Follow [owner authentication setup](docs/owner-auth-setup.md)
 and `.env.example`. Missing Auth configuration keeps the app locked. Node 22 is
-required by the pinned Supabase client. Hosted secrets must not be enabled before
-the owner-auth and schema checks pass.
+required by the pinned Supabase client. Trading storage uses the owner's verified
+session, an explicit backend setting and the shared-project trading RPCs. No
+project-wide database secret belongs in this terminal's storage configuration.
 
 ## Tabs
 
@@ -30,7 +31,8 @@ the owner-auth and schema checks pass.
   chooses the model and bounds the request size and output tokens.
 - `api/session.js` — verifies the owner's Supabase Auth session.
 - `api/log-prediction.js`, `api/predictions.js`, `api/scores.js` — owner-only
-  append/read/scoring APIs. Database receipt times come from the reviewed schema.
+  append/read/scoring APIs for the isolated trading schema. Database receipt
+  times come from the reviewed schema. NFL tables are never a fallback target.
 
 ## Local dev
 
@@ -43,13 +45,15 @@ npm run dev
 ```
 
 Configure owner Auth first (see `.env.example` and the setup guide). The market
-data endpoints use no private key; research and storage secrets remain server-side.
+data endpoints use no private key; the paid research secret remains server-side.
 
 ## Deploy
 
 Vercel auto-detects the Vite framework and the `api/` functions. Use the intended
 project, Node 22, and the staged setup/verification procedure in the owner-auth
-guide. This local patch has not been deployed.
+guide. The current feature branch and deployment evidence are tracked in
+[PR #13](https://github.com/liddar12/liddar-terminal/pull/13); a preview build does
+not establish hosted owner or storage readiness.
 
 ## Related
 

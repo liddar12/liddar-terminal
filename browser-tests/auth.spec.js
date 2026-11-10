@@ -46,6 +46,16 @@ test('owner sign-in, wrong-owner denial, private scores and sign-out work throug
   await page.getByLabel('Password', { exact: true }).fill('fixture-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('button', { name: 'AI Calls' })).toBeVisible();
+  const headers = { Authorization: `Bearer ${session(OWNER, 'owner@example.test').access_token}` };
+  const who = await request.get('/api/session', { headers });
+  expect(await who.json()).toEqual({ user: { id: OWNER, email: 'owner@example.test' } });
+  const record = { id: 'browser-import', ts: Math.floor(Date.now() / 1000), task: 'scanner', model_version: 'browser-fixture', features: {}, prediction: { side: 'call' }, horizon_s: 600 };
+  expect((await request.post('/api/log-prediction', { headers, data: record })).status()).toBe(201);
+  const imported = await (await request.get('/api/predictions?task=scanner', { headers })).json();
+  expect(imported.predictions).toHaveLength(1);
+  expect(imported.predictions[0].meta._terminal).toEqual({ owner_user_id: OWNER, provenance: 'unverified_import' });
+  expect((await request.get('/api/predictions?task=nfl.game', { headers })).status()).toBe(400);
+  expect((await request.post('/api/log-prediction', { headers, data: { ...record, task: 'nfl.game' } })).status()).toBe(400);
   await page.getByRole('button', { name: 'Scores', exact: true }).click();
   await expect(page.getByText('no resolved predictions yet', { exact: false })).toBeVisible();
   await page.reload();

@@ -8,9 +8,10 @@ import logPrediction from '../api/log-prediction.js';
 import claude from '../api/claude.js';
 
 const OWNER = '11111111-1111-4111-8111-111111111111';
+const predictionsById = new Map();
 Object.assign(process.env, {
   SUPABASE_URL: 'https://projecttest.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_fixture',
-  TERMINAL_OWNER_USER_ID: OWNER, SUPABASE_SECRET_KEY: 'sb_secret_fixture', ANTHROPIC_API_KEY: 'provider_fixture',
+  TERMINAL_OWNER_USER_ID: OWNER, TERMINAL_STORAGE_BACKEND: 'shared-trading-v1', ANTHROPIC_API_KEY: 'provider_fixture',
 });
 global.fetch = async (url, options) => {
   if (url.endsWith('/auth/v1/user')) {
@@ -20,7 +21,19 @@ global.fetch = async (url, options) => {
       return Response.json({ id: claims.sub, email: claims.sub === OWNER ? 'owner@example.test' : 'other@example.test' });
     } catch { return Response.json({ error: 'Invalid fixture token' }, { status: 401 }); }
   }
-  if (url.startsWith('https://projecttest.supabase.co/rest/v1/')) return Response.json([]);
+  if (url.startsWith('https://projecttest.supabase.co/rest/v1/rpc/')) {
+    if (options.headers.apikey !== 'sb_publishable_fixture') throw new Error('Wrong fixture API key');
+    if (!options.headers.Authorization?.startsWith('Bearer ')) throw new Error('Missing fixture owner session');
+    if (url.endsWith('/trade_bot_status')) return Response.json({ schema_version: 'shared-trading-v1', principal_kind: 'owner', server_time: '2026-11-10T22:00:00Z' });
+    const body = JSON.parse(options.body);
+    if (url.endsWith('/trade_bot_append_prediction')) {
+      const record = { ...body.p_record, received_at: '2026-11-10T21:00:00Z' };
+      predictionsById.set(record.id, record);
+      return Response.json(record.id);
+    }
+    if (url.endsWith('/trade_bot_list_predictions')) return Response.json([...predictionsById.values()].filter((r) => body.p_task == null || r.task === body.p_task).slice(0, body.p_limit));
+    if (url.endsWith('/trade_bot_list_resolved')) return Response.json([]);
+  }
   throw new Error('Unexpected external request in fixture');
 };
 const routes = { '/api/session': session, '/api/scores': scores, '/api/predictions': predictions, '/api/log-prediction': logPrediction, '/api/claude': claude };

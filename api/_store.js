@@ -1,63 +1,139 @@
 // api/_store.js
-// Supabase (PostgREST) helper for the prediction store. Underscore prefix =
+// Supabase (PostgREST) helper for the isolated trading store. Underscore prefix =
 // not deployed as a function; shared by log-prediction/predictions/scores.
 //
-// Callers MUST authorize the owner before using this server-only module.
-import { supabaseUrl } from '../shared/authConfig.js';
+// Live-verified owner sessions use authenticated RLS. There is deliberately no
+// service-key fallback and no direct access to the shared NFL tables.
+import { publicKey, supabaseUrl } from '../shared/authConfig.js';
+import { verifiedOwnerStorageContext } from './_auth.js';
+import { isTradingTask } from './_tradingTasks.js';
+
+export const STORAGE_BACKEND = 'shared-trading-v1';
+const RPC_NAMES = new Set([
+  'trade_bot_status', 'trade_bot_append_prediction',
+  'trade_bot_list_predictions', 'trade_bot_list_resolved',
+]);
+const SCORE_RECORD_LIMIT = 5000;
 
 function config() {
-  return { url: supabaseUrl(process.env.SUPABASE_URL), key: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY };
+  return { url: supabaseUrl(process.env.SUPABASE_URL), key: publicKey(process.env.SUPABASE_PUBLISHABLE_KEY) };
 }
 
 export function configured() {
   const { url, key } = config();
-  return Boolean(url && key);
+  return process.env.TERMINAL_STORAGE_BACKEND === STORAGE_BACKEND && Boolean(url && key);
 }
 
-async function rest(path, { method = 'GET', body, headers = {} } = {}) {
+async function rpc(owner, name, body = {}) {
+  const context = verifiedOwnerStorageContext(owner);
   const { url, key } = config();
-  if (!url || !key) throw new Error('Storage is not configured.');
-  const r = await fetch(`${url}/rest/v1/${path}`, {
-    method,
+  if (!configured() || url !== context.url || key !== context.key) throw new Error('Storage is not configured.');
+  if (!RPC_NAMES.has(name)) throw new Error('Unsupported trading storage operation.');
+  const r = await fetch(`${url}/rest/v1/rpc/${name}`, {
+    method: 'POST',
     headers: {
       apikey: key,
-      // Modern secret API keys are opaque, not JWT bearer tokens.
-      ...(key.startsWith('sb_secret_') ? {} : { authorization: `Bearer ${key}` }),
+      Authorization: context.authorization,
       'content-type': 'application/json',
-      ...headers,
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: JSON.stringify(body),
     redirect: 'error',
+    cache: 'no-store',
     signal: AbortSignal.timeout(12000),
   });
-  const text = await r.text();
   if (!r.ok) throw new Error(`Storage request failed (HTTP ${r.status}).`);
-  return text ? JSON.parse(text) : null;
+  try { return await r.json(); }
+  catch { throw new Error('Storage returned invalid data.'); }
 }
 
-export function insertPrediction(rec) {
-  return rest('predictions', {
-    method: 'POST',
-    body: rec,
-    headers: { prefer: 'return=minimal' },
+async function receiptCutoff(owner) {
+  const status = await rpc(owner, 'trade_bot_status');
+  if (status?.schema_version !== STORAGE_BACKEND || status.principal_kind !== 'owner'
+    || receiptMicros(status.server_time) === null) {
+    throw new Error('Trading storage is not ready for this owner.');
+  }
+  return status.server_time;
+}
+
+function checkTask(task) {
+  if (task != null && !isTradingTask(task)) throw new Error('Invalid trading task.');
+}
+
+function receiptMicros(value) {
+  if (typeof value !== 'string') return null;
+  const parts = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if (!parts) return null;
+  const milliseconds = Date.parse(`${parts[1]}${parts[3]}`);
+  return Number.isFinite(milliseconds)
+    ? BigInt(milliseconds) * 1000n + BigInt((parts[2] || '').padEnd(6, '0'))
+    : null;
+}
+
+function compareReceipts(a, b) {
+  const first = receiptMicros(a.received_at); const second = receiptMicros(b.received_at);
+  if (first !== second) return first > second ? 1 : -1;
+  // SQL uses COLLATE "C", so compare UTF-8 bytes rather than JS UTF-16 units.
+  return Buffer.compare(Buffer.from(a.id, 'utf8'), Buffer.from(b.id, 'utf8'));
+}
+
+function checkRows(rows, task, limit, { resolved = false, before = null } = {}) {
+  if (!Array.isArray(rows) || rows.length > limit || rows.some((row) => (
+    !row || typeof row !== 'object' || typeof row.id !== 'string' || !row.id || row.id.length > 200
+    || !isTradingTask(row.task) || (task != null && row.task !== task)
+    || receiptMicros(row.received_at) === null
+    || (resolved && (!Array.isArray(row.outcomes) || row.outcomes.length !== 1))
+  ))) throw new Error('Storage returned invalid trading records.');
+  let previous = before;
+  for (const row of rows) {
+    if (previous && compareReceipts(row, previous) >= 0) throw new Error('Storage returned out-of-order trading records.');
+    previous = row;
+  }
+  return rows;
+}
+
+export async function insertPrediction(owner, rec) {
+  if (!isTradingTask(rec?.task)) throw new Error('Invalid trading task.');
+  await receiptCutoff(owner);
+  const id = await rpc(owner, 'trade_bot_append_prediction', { p_record: rec });
+  if (id !== rec.id) throw new Error('Storage returned an invalid prediction receipt.');
+  return id;
+}
+
+export async function listPredictions(owner, { task, limit = 100 } = {}) {
+  checkTask(task);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw new Error('Invalid prediction limit.');
+  const asOf = await receiptCutoff(owner);
+  const rows = await rpc(owner, 'trade_bot_list_predictions', {
+    p_task: task ?? null, p_limit: limit, p_as_of: asOf,
   });
+  return checkRows(rows, task, limit);
 }
 
-export function listPredictions({ task, limit = 100 } = {}) {
-  const q = new URLSearchParams({ order: 'ts.desc', limit: String(limit) });
-  if (task) q.set('task', `eq.${task}`);
-  return rest(`predictions?${q}`);
-}
-
-export function listResolved({ task, limit = 1000 } = {}) {
-  // predictions joined to outcomes (inner join drops unresolved ones)
-  const q = new URLSearchParams({
-    select: '*,outcomes!inner(resolved_ts,realized)',
-    order: 'ts.desc',
-    limit: String(limit),
-  });
-  if (task) q.set('task', `eq.${task}`);
-  return rest(`predictions?${q}`);
+export async function listResolved(owner, { task } = {}) {
+  checkTask(task);
+  const asOf = await receiptCutoff(owner);
+  const rows = [];
+  const ids = new Set();
+  let cursor = {};
+  // Keyset pages share one database receipt cutoff. This is not an exported
+  // MVCC snapshot: reproducible evaluation also needs completed ingestion.
+  while (true) {
+    const limit = Math.min(500, SCORE_RECORD_LIMIT + 1 - rows.length);
+    const page = checkRows(await rpc(owner, 'trade_bot_list_resolved', {
+      p_task: task ?? null, p_limit: limit, p_as_of: asOf, ...cursor,
+    }), task, limit, { resolved: true, before: cursor.p_before_id == null ? null : {
+      id: cursor.p_before_id, received_at: cursor.p_before_received_at,
+    } });
+    for (const row of page) {
+      if (ids.has(row.id)) throw new Error('Storage returned a repeated prediction.');
+      ids.add(row.id);
+      rows.push(row);
+    }
+    if (rows.length > SCORE_RECORD_LIMIT) throw new Error('Score history exceeds the supported request size.');
+    if (page.length < limit) return rows;
+    const last = page.at(-1);
+    cursor = { p_before_received_at: last.received_at, p_before_id: last.id };
+  }
 }
 
 // --- scoring (mirrors selflearn_core.scoring.metrics conventions) ---

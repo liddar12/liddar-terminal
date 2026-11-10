@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { requireOwner } from '../api/_auth.js';
+import { requireOwner, verifiedOwnerStorageContext } from '../api/_auth.js';
 import { assertPublicBuildConfig, publicAuthConfig, localDevApiOrigin } from '../shared/authConfig.js';
 import { makeAuthenticatedFetch } from '../src/authTransport.js';
 
@@ -41,6 +41,10 @@ test('verified owner is accepted; forged identity is never decoded locally', asy
     return Response.json({ id: OWNER, email: 'owner@example.test', private_property: 'never forwarded' });
   } });
   assert.deepEqual(user, { id: OWNER, email: 'owner@example.test' });
+  assert.equal(Object.isFrozen(user), true);
+  assert.ok(!JSON.stringify(user).includes(TOKEN));
+  assert.equal(verifiedOwnerStorageContext(user).authorization, `Bearer ${TOKEN}`);
+  assert.throws(() => verifiedOwnerStorageContext({ ...user }), /Verified owner/);
 });
 
 test('a valid session for another account does not authorize access', async () => {
