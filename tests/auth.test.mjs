@@ -76,7 +76,7 @@ test('public build configuration rejects secret keys, dangerous URLs and stray V
 });
 
 test('Vercel build metadata is accepted without accepting credential-like or unknown names', () => {
-  assertPublicBuildConfig({ VITE_VERCEL_ENV: 'preview', VITE_VERCEL_URL: 'fixture.vercel.app', VITE_VERCEL_GIT_COMMIT_SHA: 'fixture' });
+  assertPublicBuildConfig({ VITE_VERCEL_ENV: 'preview', VITE_VERCEL_REGION: 'iad1', VITE_VERCEL_URL: 'fixture.vercel.app', VITE_VERCEL_GIT_COMMIT_SHA: 'fixture' });
   for (const name of [
     'VITE_VERCEL_TOKEN', 'VITE_VERCEL_OIDC_TOKEN', 'VITE_VERCEL_SECRET',
     'VITE_VERCEL_API_KEY', 'VITE_VERCEL_UNKNOWN', 'VITE_OTHER_SETTING',
@@ -84,6 +84,33 @@ test('Vercel build metadata is accepted without accepting credential-like or unk
   ]) {
     assert.throws(() => assertPublicBuildConfig({ [name]: 'fixture-must-not-ship' }), name);
   }
+});
+
+test('rejected-variable diagnostic bounds and sanitizes names without inspecting or printing values', () => {
+  const secret = 'SYNTHETIC_SECRET_VALUE_MUST_NEVER_BE_LOGGED';
+  const names = Array.from({ length: 12 }, (_, i) => `VITE_UNKNOWN_${String(i).padStart(2, '0')}`);
+  const env = Object.fromEntries(names.map((name) => [name, secret]));
+  assert.throws(() => assertPublicBuildConfig(env), (error) => {
+    for (const name of names.slice(0, 8)) assert.ok(error.message.includes(name));
+    for (const name of names.slice(8)) assert.ok(!error.message.includes(name));
+    assert.ok(error.message.includes('(+4 more)'));
+    assert.ok(!error.message.includes(secret));
+    assert.ok(error.message.length < 850);
+    return true;
+  });
+  for (const name of ['VITE_BAD\nINJECTED', 'VITE_BAD\u001b[31m', 'VITE_bad', `VITE_${'A'.repeat(100)}`]) {
+    assert.throws(() => assertPublicBuildConfig({ [name]: secret }), (error) => {
+      assert.ok(error.message.includes('[invalid-name]'));
+      assert.ok(!error.message.includes(name));
+      assert.ok(!error.message.includes(secret));
+      assert.ok(!/[\n\r\u001b]/.test(error.message));
+      return true;
+    });
+  }
+  const unreadable = Object.defineProperty({}, 'VITE_CREDENTIAL', {
+    enumerable: true, get() { assert.fail('the diagnostic must not inspect any rejected value'); },
+  });
+  assert.throws(() => assertPublicBuildConfig(unreadable), /Rejected names: VITE_CREDENTIAL/);
 });
 
 test('client sends session only to local API routes, never follows redirects or retries mutations', async () => {
