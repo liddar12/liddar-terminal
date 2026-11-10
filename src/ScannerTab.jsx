@@ -1,19 +1,22 @@
 // src/ScannerTab.jsx
 // AI Calls / AI Puts scanner.
 //
-// SCAFFOLD NOTE: the production scanner prompt from the original liddar-terminal
-// app is not in this repo. buildScannerPrompt() below is a working placeholder —
-// swap in the real prompt wording when available. Everything around it is
-// production wiring: live breadth regime injection (docs/breadth-integration.md
-// §2), strict-JSON idea output, and append-only prediction logging to
-// /api/log-prediction using the SelfLearning data contract (incl. the
-// features.breadth regime stamp).
+// Prompt: the production V2 scanner prompt, recovered from the original
+// deployment (see src/scannerPrompt.js). Market lines come from /api/quotes;
+// a scan with no quotes is refused rather than letting the model guess prices.
+// The live breadth regime is injected (docs/breadth-integration.md §2) and every
+// idea is logged append-only to /api/log-prediction using the SelfLearning data
+// contract, including the features.breadth regime stamp.
 
 import { useState } from 'react';
-
-const HORIZON_S = 7 * 86_400; // resolve ideas against the move over one week
-const CONFIDENCE = { low: 0.35, med: 0.5, high: 0.65 };
-const MODEL_VERSION = 'scanner-scaffold@v1';
+import {
+  CONFIDENCE,
+  MODEL_VERSION,
+  buildScannerPrompt,
+  horizonSeconds,
+  keepQuoted,
+  parseIdeasJson,
+} from './scannerPrompt.js';
 
 async function getBreadth() {
   try {
@@ -46,34 +49,12 @@ function breadthStamp(b) {
   };
 }
 
-// Placeholder prompt — swap for the production scanner prompt. The strict-JSON
-// output contract below should survive that swap so logging keeps working.
-function buildScannerPrompt(side, tickers, line) {
-  return (
-    `You are an options scanner. From this watchlist, pick the strongest ` +
-    `${side === 'puts' ? 'PUT' : 'CALL'} candidates: ${tickers}.` +
-    line +
-    `\n\nRespond with ONLY a JSON array, no prose, of at most 5 objects: ` +
-    `[{"ticker": "...", "thesis": "one line", "conviction": "low|med|high"}]`
-  );
-}
-
-function parseIdeas(text) {
-  const m = text.match(/\[[\s\S]*\]/);
-  if (!m) return null;
-  try {
-    const arr = JSON.parse(m[0]);
-    if (!Array.isArray(arr)) return null;
-    return arr
-      .filter((x) => x && typeof x.ticker === 'string')
-      .map((x) => ({
-        ticker: x.ticker.toUpperCase(),
-        thesis: String(x.thesis ?? ''),
-        conviction: ['low', 'med', 'high'].includes(x.conviction) ? x.conviction : 'med',
-      }));
-  } catch {
-    return null;
-  }
+async function getQuotes(tickers) {
+  const symbols = [...new Set([...tickers, 'SPY'])].join(',');
+  const r = await fetch(`/api/quotes?symbols=${encodeURIComponent(symbols)}`);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `quotes HTTP ${r.status}`);
+  return j; // { quotes, errors }
 }
 
 async function logIdeas(side, ideas, breadth) {
@@ -90,9 +71,19 @@ async function logIdeas(side, ideas, breadth) {
           model_version: MODEL_VERSION,
           task: 'scanner',
           features: stamp ? { breadth: stamp } : {},
-          prediction: { side: side === 'puts' ? 'put' : 'call', symbol: idea.ticker, thesis: idea.thesis },
-          confidence: CONFIDENCE[idea.conviction],
-          horizon_s: HORIZON_S,
+          prediction: {
+            side: side === 'puts' ? 'put' : 'call',
+            symbol: idea.ticker,
+            entry_price: idea.currentPrice,
+            strike: idea.strike,
+            expiry: idea.expiry,
+            est_premium: idea.estimatedPremium,
+            target: idea.targetPrice,
+            stop: idea.stopLevel,
+            thesis: idea.thesis,
+          },
+          confidence: CONFIDENCE[idea.confidence],
+          horizon_s: horizonSeconds(idea),
           cohort: idea.ticker,
         }),
       }).then((r) => {
@@ -109,10 +100,12 @@ async function logIdeas(side, ideas, breadth) {
 }
 
 const CONVICTION_CLASS = {
-  high: 'text-term-up border-term-up',
-  med: 'text-term-accent border-term-accent',
-  low: 'text-term-muted border-term-grid',
+  HIGH: 'text-term-up border-term-up',
+  MEDIUM: 'text-term-accent border-term-accent',
+  LOW: 'text-term-muted border-term-grid',
 };
+
+const px = (n) => (typeof n === 'number' ? n.toFixed(2) : '—');
 
 export default function ScannerTab({ side }) {
   const [tickers, setTickers] = useState('NVDA, MSFT, XOM, EQT, BAC, GLD, TLT');
@@ -125,19 +118,28 @@ export default function ScannerTab({ side }) {
     setError(null);
     setOut(null);
     try {
-      const breadth = await getBreadth();
+      const list = tickers
+        .split(',')
+        .map((t) => t.trim().toUpperCase())
+        .filter(Boolean);
+      if (!list.length) throw new Error('enter at least one ticker');
+      const [breadth, q] = await Promise.all([getBreadth(), getQuotes(list)]);
+      const quoted = list.filter((t) => q.quotes[t]);
+      if (!quoted.length) throw new Error('no quotes for these tickers; not scanning without prices');
       const line = regimeLine(breadth);
-      const prompt = buildScannerPrompt(side, tickers, line);
+      const prompt = buildScannerPrompt(side, quoted, q.quotes, line);
       const r = await fetch('/api/claude', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] }),
+        body: JSON.stringify({ max_tokens: 3000, messages: [{ role: 'user', content: prompt }] }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
       const text = (j.content || []).map((b) => b.text || '').join('').trim();
-      const ideas = parseIdeas(text);
-      const result = { ideas, raw: ideas ? null : text, regimeUsed: !!line, logged: null };
+      const parsed = parseIdeasJson(text);
+      const ideas = parsed ? keepQuoted(parsed, q.quotes) : null;
+      const skipped = Object.keys(q.errors || {});
+      const result = { ideas, raw: ideas ? null : text, regimeUsed: !!line, logged: null, skipped };
       setOut(result);
       if (ideas?.length) {
         const logged = await logIdeas(side, ideas, breadth);
@@ -157,7 +159,7 @@ export default function ScannerTab({ side }) {
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <span className="text-[15px] font-semibold text-term-fg">{title}</span>
         <span className="rounded border border-term-grid px-1.5 py-0.5 text-[11px] text-term-muted">
-          scaffold prompt · logs to selflearn store
+          production prompt · logs to selflearn store
         </span>
       </div>
 
@@ -187,6 +189,9 @@ export default function ScannerTab({ side }) {
       {out && (
         <>
           <div className="mb-2 flex flex-wrap gap-3 text-[11px]">
+            {out.skipped?.length > 0 && (
+              <span className="text-term-down">no quote, skipped: {out.skipped.join(', ')}</span>
+            )}
             <span className={out.regimeUsed ? 'text-term-up' : 'text-term-muted'}>
               {out.regimeUsed
                 ? 'breadth regime injected into prompt'
@@ -197,7 +202,7 @@ export default function ScannerTab({ side }) {
                 <span className="text-term-muted">predictions not logged — storage not configured</span>
               ) : (
                 <span className="text-term-up">
-                  logged {out.logged.ok}/{out.logged.total} predictions (7d horizon)
+                  logged {out.logged.ok}/{out.logged.total} predictions (horizon = expiry)
                 </span>
               ))}
           </div>
@@ -207,22 +212,32 @@ export default function ScannerTab({ side }) {
               <thead>
                 <tr className="border-b border-term-grid text-left text-[11px] text-term-muted">
                   <th className="py-1.5 pr-3 font-normal">ticker</th>
+                  <th className="py-1.5 pr-3 font-normal">price</th>
+                  <th className="py-1.5 pr-3 font-normal">strike / expiry</th>
+                  <th className="py-1.5 pr-3 font-normal">target / stop</th>
                   <th className="py-1.5 pr-3 font-normal">thesis</th>
-                  <th className="py-1.5 font-normal">conviction</th>
+                  <th className="py-1.5 font-normal">confidence</th>
                 </tr>
               </thead>
               <tbody>
-                {out.ideas.map((idea) => (
-                  <tr key={idea.ticker} className="border-b border-term-grid/50">
+                {out.ideas.map((idea, idx) => (
+                  <tr key={`${idea.ticker}-${idx}`} className="border-b border-term-grid/50">
                     <td className="py-2 pr-3 font-semibold text-term-fg">{idea.ticker}</td>
+                    <td className="py-2 pr-3 text-term-fg/90">{px(idea.currentPrice)}</td>
+                    <td className="py-2 pr-3 text-term-fg/90">
+                      {px(idea.strike)} · {idea.expiry || '—'}
+                    </td>
+                    <td className="py-2 pr-3 text-term-fg/90">
+                      {px(idea.targetPrice)} / {px(idea.stopLevel)}
+                    </td>
                     <td className="py-2 pr-3 text-term-fg/90">{idea.thesis}</td>
                     <td className="py-2">
                       <span
                         className={
-                          'rounded border px-1.5 py-0.5 text-[11px] ' + CONVICTION_CLASS[idea.conviction]
+                          'rounded border px-1.5 py-0.5 text-[11px] ' + CONVICTION_CLASS[idea.confidence]
                         }
                       >
-                        {idea.conviction}
+                        {idea.confidence}
                       </span>
                     </td>
                   </tr>
@@ -239,8 +254,9 @@ export default function ScannerTab({ side }) {
 
       {!out && !error && (
         <p className="text-[13px] text-term-muted">
-          Enter a watchlist and run a scan. The live RSP/SPY breadth regime is injected into the prompt,
-          and every idea is logged as an append-only prediction (with the regime stamp) for scoring.
+          Enter a watchlist and run a scan. Live quotes and the RSP/SPY breadth regime go into the
+          production prompt, and every idea is logged as an append-only prediction (with the regime
+          stamp) for scoring.
         </p>
       )}
     </div>
