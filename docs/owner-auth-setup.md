@@ -1,11 +1,11 @@
 # Owner authentication setup
 
-This patch is prepared against main `6f4af5112c4a43247428f1ad64cd9ebdb5fa9602`. It has not been pushed, merged or deployed. It protects terminal data and paid research requests; it does not authorize brokerage orders or make the bot autonomous.
+This patch is based on main `6f4af5112c4a43247428f1ad64cd9ebdb5fa9602` and is published as [draft PR #13](https://github.com/liddar12/liddar-terminal/pull/13). Code commit `e789921b15bac73ce9fc11eb5a24e632e7f37ecd` passed CI and produced a READY Vercel preview; its hosted `/api/session` returned the expected 503 because owner Auth is not configured. The PR has not been merged or deployed to production. It protects terminal data and paid research requests; it does not authorize brokerage orders or make the bot autonomous.
 
 ## Configure the intended project
 
-1. Select the reviewed Supabase project. The connected account currently cannot access the prior learning project; do not use the unrelated AYSO project as a substitute.
-2. Enable Supabase email/password Auth and disable public signups. Create the owner's verified Auth account using Supabase's administration flow. The owner chooses/receives the password through a private account setup process. Do not put it in a source file, environment variable, chat, or frontend form default.
+1. Select the reviewed isolated Supabase project. On November 10, access to `SelfLearningAI` (`omavgimpnvrpuxqhfxpf`) in the `SelfLearningAI` organization was verified. It already contains the NFL learning store and private journals. Current terminal routes do not enforce a trading-only task boundary, and Auth and storage share `SUPABASE_URL`. The proposed dedicated trading project is `liddar-trading`, pending the owner's organization selection and an actual cost quote. See the [access and isolation record](https://github.com/liddar12/SelfLearning/blob/codex/automation-tooling-shadow/docs/supabase-access-and-isolation-2026-11-10.md). Do not point this terminal at the shared NFL store or use AYSO as a substitute.
+2. On the selected isolated trading project, enable Supabase email/password Auth and disable public signups. Do not apply project-wide Auth changes to the existing NFL project without reviewing its other consumers. Create the owner's verified Auth account using Supabase's administration flow. The owner chooses/receives the password through a private account setup process. Do not put it in a source file, environment variable, chat, or frontend form default.
 3. Copy the owner's immutable Auth **user UUID** to the server setting `TERMINAL_OWNER_USER_ID`. An email address is not the authorization identifier. Other accounts, even with valid Supabase sessions, receive HTTP 403.
 4. Configure the following variables on the intended terminal project. Build-time and server URLs must point to the same Supabase project. Keep preview/staging data isolated from production.
 
