@@ -37,23 +37,27 @@ export const PUBLIC_AUTH_ENV_NAMES = Object.freeze([
 // https://vercel.com/docs/environment-variables/framework-environment-variables
 // REGION is also explicitly injected by official @vercel/build-utils:
 // https://github.com/vercel/vercel/blob/main/packages/build-utils/src/get-prefixed-env-vars.ts
-const VERCEL_METADATA_ENV_NAMES = new Set([
+// OBSERVABILITY_CLIENT_CONFIG was observed as an injected build input on
+// dpl_7ref4rpzSQfGoPmyHbBnfaRhTVFA. Its value was not inspected and is NOT
+// classified as public or exposed to the browser.
+const VERCEL_BUILD_ENV_NAMES = new Set([
   'ENV', 'TARGET_ENV', 'REGION', 'URL', 'BRANCH_URL', 'PROJECT_PRODUCTION_URL',
   'DEPLOYMENT_ID', 'PROJECT_ID', 'GIT_PROVIDER', 'GIT_REPO_SLUG',
   'GIT_REPO_OWNER', 'GIT_REPO_ID', 'GIT_COMMIT_REF', 'GIT_COMMIT_SHA',
   'GIT_COMMIT_MESSAGE', 'GIT_COMMIT_AUTHOR_LOGIN', 'GIT_COMMIT_AUTHOR_NAME',
   'GIT_PREVIOUS_SHA', 'GIT_PULL_REQUEST_ID',
+  'OBSERVABILITY_CLIENT_CONFIG',
 ].map((name) => `VITE_VERCEL_${name}`));
 
 export function assertPublicBuildConfig(env = {}) {
   const allowed = new Set(PUBLIC_AUTH_ENV_NAMES);
-  const rejected = Object.keys(env).filter((k) => k.startsWith('VITE_') && !allowed.has(k) && !VERCEL_METADATA_ENV_NAMES.has(k)).sort();
+  const rejected = Object.keys(env).filter((k) => k.startsWith('VITE_') && !allowed.has(k) && !VERCEL_BUILD_ENV_NAMES.has(k)).sort();
   if (rejected.length) {
     // Build-only diagnostic: at most 8 names of at most 80 safe characters.
     // Never inspect values; malformed names cannot inject control characters.
     const names = rejected.slice(0, 8).map((k) => /^VITE_[A-Z0-9_]{1,75}$/.test(k) ? k : '[invalid-name]');
     const remaining = rejected.length > 8 ? ` (+${rejected.length - 8} more)` : '';
-    throw new Error(`Only documented public sign-in settings and Vercel metadata may use the VITE_ prefix. Rejected names: ${names.join(', ')}${remaining}. Values omitted.`);
+    throw new Error(`Only approved public sign-in settings and Vercel build input names may use the VITE_ prefix. Rejected names: ${names.join(', ')}${remaining}. Values omitted.`);
   }
   if ((env.VITE_SUPABASE_URL || env.VITE_SUPABASE_PUBLISHABLE_KEY) && !publicAuthConfig(env)) {
     throw new Error('Invalid public sign-in settings. Never put a secret or service-role key in VITE_ variables.');

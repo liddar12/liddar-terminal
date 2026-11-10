@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 
-// Documented Vercel deployment inputs, independent of the implementation's set.
+// Documented metadata plus the observed platform configuration name. All values
+// are synthetic; accepting a build input does not classify its value as public.
 const METADATA_NAMES = [
   'VITE_VERCEL_ENV', 'VITE_VERCEL_TARGET_ENV', 'VITE_VERCEL_REGION', 'VITE_VERCEL_URL',
   'VITE_VERCEL_BRANCH_URL', 'VITE_VERCEL_PROJECT_PRODUCTION_URL',
@@ -14,9 +15,10 @@ const METADATA_NAMES = [
   'VITE_VERCEL_GIT_COMMIT_MESSAGE', 'VITE_VERCEL_GIT_COMMIT_AUTHOR_LOGIN',
   'VITE_VERCEL_GIT_COMMIT_AUTHOR_NAME', 'VITE_VERCEL_GIT_PREVIOUS_SHA',
   'VITE_VERCEL_GIT_PULL_REQUEST_ID',
+  'VITE_VERCEL_OBSERVABILITY_CLIENT_CONFIG',
 ];
 
-test('production build with Vercel metadata ships only the public Auth settings', async (t) => {
+test('production build with Vercel inputs ships only the public Auth settings', async (t) => {
   const saved = { ...process.env };
   t.after(() => { process.env = saved; });
   // Use only synthetic public values, never an actual deployment environment.

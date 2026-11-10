@@ -75,11 +75,13 @@ test('public build configuration rejects secret keys, dangerous URLs and stray V
   assert.throws(() => assertPublicBuildConfig({ ...good, VITE_ANTHROPIC_API_KEY: 'bad' }));
 });
 
-test('Vercel build metadata is accepted without accepting credential-like or unknown names', () => {
+test('approved Vercel build inputs are accepted without accepting credential-like or unknown names', () => {
   assertPublicBuildConfig({ VITE_VERCEL_ENV: 'preview', VITE_VERCEL_REGION: 'iad1', VITE_VERCEL_URL: 'fixture.vercel.app', VITE_VERCEL_GIT_COMMIT_SHA: 'fixture' });
+  assertPublicBuildConfig({ VITE_VERCEL_OBSERVABILITY_CLIENT_CONFIG: 'opaque-synthetic-build-input' });
   for (const name of [
     'VITE_VERCEL_TOKEN', 'VITE_VERCEL_OIDC_TOKEN', 'VITE_VERCEL_SECRET',
     'VITE_VERCEL_API_KEY', 'VITE_VERCEL_UNKNOWN', 'VITE_OTHER_SETTING',
+    'VITE_VERCEL_OBSERVABILITY_CLIENT_CONFIG_SECRET',
     'VITE_SUPABASE_URL_SECRET', 'VITE_SUPABASE_PUBLISHABLE_KEY_SECRET',
   ]) {
     assert.throws(() => assertPublicBuildConfig({ [name]: 'fixture-must-not-ship' }), name);
