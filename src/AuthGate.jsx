@@ -82,7 +82,10 @@ export default function AuthGate({ children }) {
     }
   }
 
-  if (phase === 'ready' && verified?.token === session?.access_token) {
+  // SIGNED_OUT can clear the session before the phase effect runs. Missing
+  // tokens must not compare equal and re-enter the private render branch.
+  if (phase === 'ready' && verified && session?.access_token
+    && verified.token === session.access_token) {
     return <>
       <div className="mx-auto flex max-w-5xl items-center justify-end gap-3 px-4 pt-3 text-xs text-term-muted">
         <span>{verified.user.email || 'Owner session'}</span>
