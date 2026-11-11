@@ -1,3 +1,4 @@
+import { authenticatedFetch } from './auth.js';
 // src/ScannerTab.jsx
 // AI Calls / AI Puts scanner.
 //
@@ -20,7 +21,7 @@ import {
 
 async function getBreadth() {
   try {
-    const r = await fetch('/api/breadth');
+    const r = await authenticatedFetch('/api/breadth');
     if (!r.ok) return null; // omit on failure, never fabricate
     return await r.json();
   } catch {
@@ -51,7 +52,7 @@ function breadthStamp(b) {
 
 async function getQuotes(tickers) {
   const symbols = [...new Set([...tickers, 'SPY'])].join(',');
-  const r = await fetch(`/api/quotes?symbols=${encodeURIComponent(symbols)}`);
+  const r = await authenticatedFetch(`/api/quotes?symbols=${encodeURIComponent(symbols)}`);
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || `quotes HTTP ${r.status}`);
   return j; // { quotes, errors }
@@ -62,7 +63,7 @@ async function logIdeas(side, ideas, breadth) {
   const now = Math.floor(Date.now() / 1000);
   const results = await Promise.allSettled(
     ideas.map((idea) =>
-      fetch('/api/log-prediction', {
+      authenticatedFetch('/api/log-prediction', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -128,7 +129,7 @@ export default function ScannerTab({ side }) {
       if (!quoted.length) throw new Error('no quotes for these tickers; not scanning without prices');
       const line = regimeLine(breadth);
       const prompt = buildScannerPrompt(side, quoted, q.quotes, line);
-      const r = await fetch('/api/claude', {
+      const r = await authenticatedFetch('/api/claude', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ max_tokens: 3000, messages: [{ role: 'user', content: prompt }] }),

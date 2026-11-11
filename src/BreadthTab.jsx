@@ -1,3 +1,4 @@
+import { authenticatedFetch } from './auth.js';
 // src/BreadthTab.jsx
 // Breadth tab: RSP/SPY ratio from /api/breadth, charted with Recharts.
 //
@@ -52,7 +53,7 @@ export default function BreadthTab() {
 
   const load = async () => {
     try {
-      const r = await fetch('/api/breadth');
+      const r = await authenticatedFetch('/api/breadth');
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
       setData(j);

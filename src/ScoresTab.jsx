@@ -1,3 +1,4 @@
+import { authenticatedFetch } from './auth.js';
 // src/ScoresTab.jsx
 // Live self-learning scores from /api/scores: hit rate with Wilson CI per
 // task/cohort over resolved predictions. Honest empty states: storage not
@@ -13,7 +14,7 @@ export default function ScoresTab() {
     let alive = true;
     (async () => {
       try {
-        const r = await fetch('/api/scores');
+        const r = await authenticatedFetch('/api/scores');
         const j = await r.json();
         if (!alive) return;
         if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);

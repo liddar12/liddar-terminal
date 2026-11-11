@@ -5,21 +5,24 @@
 // empty list (honest, not fabricated).
 
 import { configured, listResolved, scoreIdeas } from './_store.js';
+import { requireOwner } from './_auth.js';
+import { isTradingTask } from './_tradingTasks.js';
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
+  const owner = await requireOwner(req, res);
+  if (!owner) return;
   if (!configured()) {
     return res.status(503).json({
-      error: 'storage not configured: set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY',
+      error: 'Storage is not configured.',
     });
   }
   try {
     const { task } = req.query || {};
-    const rows = await listResolved({ task: task || undefined });
+    if (task != null && !isTradingTask(task)) return res.status(400).json({ error: 'Invalid trading task.' });
+    const rows = await listResolved(owner, { task });
     return res.status(200).json({ scores: scoreIdeas(rows), resolved_count: rows.length });
   } catch (e) {
-    console.error('scores read failed:', e.message);
-    return res.status(502).json({ error: e.message });
+    return res.status(502).json({ error: 'Prediction storage is temporarily unavailable.' });
   }
 }
