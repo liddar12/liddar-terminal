@@ -17,7 +17,9 @@ export function makeAuthenticatedFetch(getClient, fetchImpl = fetch, onUnauthori
     const headers = new Headers(options.headers);
     headers.set('Authorization', `Bearer ${token}`);
     const response = await fetchImpl(path, {
-      ...options, headers, cache: 'no-store', credentials: 'omit', redirect: 'error',
+      // Protected previews also require their same-origin access cookie.
+      // The destination guard above and redirect refusal keep credentials local.
+      ...options, headers, cache: 'no-store', credentials: 'same-origin', redirect: 'error',
     });
     if (response.status === 401) onUnauthorized(token);
     return response;

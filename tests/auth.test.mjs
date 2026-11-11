@@ -119,7 +119,7 @@ test('rejected-variable diagnostic bounds and sanitizes names without inspecting
   assert.throws(() => assertPublicBuildConfig(unreadable), /Rejected names: VITE_CREDENTIAL/);
 });
 
-test('client sends session only to local API routes, never follows redirects or retries mutations', async () => {
+test('client keeps bearer and preview credentials local, never follows redirects or retries mutations', async () => {
   const calls = [];
   const client = { auth: { getSession: async () => ({ data: { session: { access_token: TOKEN } } }) } };
   let expired = null;
@@ -128,11 +128,12 @@ test('client sends session only to local API routes, never follows redirects or 
     await assert.rejects(api(path));
   }
   assert.equal(calls.length, 0);
-  await api('/api/log-prediction', { method: 'POST', headers: { Authorization: 'wrong' }, body: '{}' });
+  await api('/api/log-prediction', { method: 'POST', headers: { Authorization: 'wrong' }, body: '{}',
+    credentials: 'include', redirect: 'follow', cache: 'force-cache' });
   assert.equal(calls.length, 1); assert.equal(expired, TOKEN);
   const options = calls[0][1];
   assert.equal(options.headers.get('Authorization'), `Bearer ${TOKEN}`);
-  assert.equal(options.redirect, 'error'); assert.equal(options.cache, 'no-store'); assert.equal(options.credentials, 'omit');
+  assert.equal(options.redirect, 'error'); assert.equal(options.cache, 'no-store'); assert.equal(options.credentials, 'same-origin');
 });
 
 test('client without a session does not send requests', async () => {

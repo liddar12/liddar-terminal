@@ -48,5 +48,10 @@ http.createServer(async (req, res) => {
   if (url.pathname === '/api/breadth') return res.status(502).json({ error: 'No market fixture data' });
   const route = routes[url.pathname];
   if (!route) return res.status(404).json({ error: 'Missing fixture route' });
+  // Model a hosting access gate independently of the application's owner Auth.
+  // Browser fetches using credentials:'omit' must fail even with a valid bearer.
+  if (!(req.headers.cookie || '').split(';').some((cookie) => cookie.trim() === 'fixture_preview_access=allowed')) {
+    return res.status(403).json({ error: 'Fixture preview access required.' });
+  }
   await route(req, res);
 }).listen(3101, '127.0.0.1');
